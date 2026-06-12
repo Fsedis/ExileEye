@@ -53,7 +53,7 @@ public sealed class OcrReader : IDisposable
         return MergePasses(colPass.Result, sparsePass.Result);
     }
 
-    /// <summary>Crop decorations → invert (game text is light-on-dark) → 2× bicubic upscale → PNG.</summary>
+    /// <summary>Crop decorations → fix polarity → 2× bicubic upscale → PNG.</summary>
     private static byte[] PrepareImage(Bitmap region)
     {
         int left = Math.Max(1, (int)(region.Width * LeftCropFraction));
@@ -69,11 +69,41 @@ public sealed class OcrReader : IDisposable
                 new Rectangle(left, 0, w, region.Height),
                 GraphicsUnit.Pixel);
         }
-        InvertInPlace(work);
+
+        // Tesseract reads dark-on-light best, and the game uses both polarities: the exchange
+        // panel is light text on a dark surface (invert it), the runeshaping-combinations book
+        // is dark text on light parchment (inverting THAT degraded marginal rows to misses —
+        // only rows brightened by mouse hover survived). Mean luminance picks the polarity.
+        if (MeanLuminance(work) < 128) InvertInPlace(work);
 
         using var ms = new MemoryStream();
         work.Save(ms, System.Drawing.Imaging.ImageFormat.Png);
         return ms.ToArray();
+    }
+
+    private static int MeanLuminance(Bitmap bmp)
+    {
+        const int step = 8;   // sparse grid is plenty for a brightness average
+        var data = bmp.LockBits(new Rectangle(0, 0, bmp.Width, bmp.Height),
+            ImageLockMode.ReadOnly, PixelFormat.Format24bppRgb);
+        try
+        {
+            long sum = 0;
+            int samples = 0;
+            var row = new byte[data.Stride];
+            for (int y = 0; y < bmp.Height; y += step)
+            {
+                Marshal.Copy(data.Scan0 + y * data.Stride, row, 0, data.Stride);
+                for (int x = 0; x < bmp.Width; x += step)
+                {
+                    int o = x * 3;
+                    sum += (row[o] + row[o + 1] + row[o + 2]) / 3;
+                    samples++;
+                }
+            }
+            return samples > 0 ? (int)(sum / samples) : 0;
+        }
+        finally { bmp.UnlockBits(data); }
     }
 
     private static void InvertInPlace(Bitmap bmp)
