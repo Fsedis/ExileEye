@@ -27,35 +27,31 @@ public partial class MainWindow : FluentWindow
     {
         _settings = Settings.Load();
 
+        RefreshRegionLabel();
+
+        // Resolve the league list first (one quick call), then fetch prices exactly once for
+        // the league that will actually be selected.
+        var leagues = await LeagueDirectory.FetchAsync(_http);
+
         _populating = true;
         LanguageBox.ItemsSource = Settings.Languages.Select(l => l.Label);
         LanguageBox.SelectedIndex = Math.Max(0,
             Array.FindIndex(Settings.Languages, l => l.Code == _settings.Language));
-        PopulateLeagues(Settings.Leagues);
+        PopulateLeagues(leagues.Count > 0 ? leagues : Settings.Leagues);
         _populating = false;
 
-        RefreshRegionLabel();
-
-        // Live league list and the price fetch run together; the dropdown quietly upgrades from
-        // the built-in fallback once poe.ninja answers.
-        var leaguesTask = LeagueDirectory.FetchAsync(_http);
         await ReloadPricesAsync();
-        var leagues = await leaguesTask;
-        if (leagues.Count > 0)
-        {
-            _populating = true;
-            PopulateLeagues(leagues);
-            _populating = false;
-        }
     }
 
     private void PopulateLeagues(IReadOnlyList<string> leagues)
     {
-        // The saved league stays selectable even if poe.ninja no longer lists it.
-        var list = leagues.Contains(_settings.League)
-            ? leagues
-            : [.. leagues, _settings.League];
-        LeagueBox.ItemsSource = list;
+        LeagueBox.ItemsSource = leagues;
+        if (!leagues.Contains(_settings.League))
+        {
+            // The saved league ended — poe.ninja lists the current one first.
+            _settings.League = leagues[0];
+            _settings.Save();
+        }
         LeagueBox.SelectedItem = _settings.League;
     }
 
