@@ -1,0 +1,27 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <AssemblyTitle>ExileEye</AssemblyTitle>
+    <Product>ExileEye</Product>
+    <Description>On-screen price checker overlay for Path of Exile 2 — OCRs the panel, shows live poe.ninja prices. English and Russian clients.</Description>
+    <Version>0.1.0</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="ExileEye.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="SharpHook" Version="7.1.2" />
+    <PackageReference Include="Tesseract" Version="5.2.0" />
+    <PackageReference Include="Tesseract.Data.English" Version="4.0.0" />
+    <PackageReference Include="WPF-UI" Version="4.3.0" />
+  </ItemGroup>
+
+</Project>
