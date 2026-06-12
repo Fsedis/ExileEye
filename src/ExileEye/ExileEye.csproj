@@ -15,6 +15,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="ExileEye.Tests" />
+    <None Update="data\ru-names.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

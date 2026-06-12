@@ -11,15 +11,24 @@ without alt-tabbing. English and Russian game clients are both first-class.
 
 ## Status
 
-🚧 Early development — the app shell builds, the core engine is being written.
+🚧 Early development — the core engine works end to end: screen capture → OCR →
+live poe.ninja prices → click-through overlay. Calibrate with one drag, `F5`
+starts/stops, `Esc` or `Ctrl+Click` hides the overlay.
+
+## Working today
+
+- Live prices next to each panel row, stack-aware (`2.4 (0.4 ea)`) — both the
+  exchange panel's `14x` prefix and the combinations panel's `(6)` suffix
+- English & Russian clients (the Russian OCR model downloads on first use)
+- Exact → prefix → fuzzy name matching that shrugs off OCR misreads
+- One-drag region calibration, Fluent settings window
 
 ## Planned
 
-- First-run wizard: language → league (auto-detected) → one-drag region calibration
-- Live prices next to each panel row, stack-aware (`2.4 (0.4 each)`)
-- English & Russian client support, localized UI
-- Tray icon, human-readable status, global hotkeys
+- First-run wizard, auto-detected league list
+- Tray icon, localized UI (ru/en)
 - One-click installer with auto-updates (Velopack)
+- Currency icons in the overlay instead of `div`/`ex` text
 
 ## Build from source
 
