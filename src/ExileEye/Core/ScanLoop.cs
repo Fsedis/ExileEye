@@ -16,6 +16,10 @@ public sealed class ScanLoop : IDisposable
     private const int FramesToOpen = 2;        // bright frames before OCR starts (hysteresis)
     private const int FramesToClose = 3;       // dark frames before the panel counts as closed
     private const int TopmostEveryFrames = 10; // periodically re-assert overlay z-order over the game
+    // The "…" reading hint only shows this long after the brightness gate opens. A real panel
+    // confirms (first priced row) well inside this window; anything still unconfirmed after it
+    // is a false positive — bright pavement, a vista — and must not leave the hint hanging.
+    private const int ReadingHintWindowMs = 2500;
 
     private readonly Settings _settings;
     private readonly PriceBook _prices;
@@ -76,6 +80,7 @@ public sealed class ScanLoop : IDisposable
 
         bool panelUp = false, confirmed = false;
         int brightStreak = 0, darkStreak = 0, dismissedDark = 0, frame = 0;
+        long panelUpAt = 0;
         IReadOnlyList<DisplayRow> rows = [];
 
         while (!ct.IsCancellationRequested)
@@ -102,7 +107,7 @@ public sealed class ScanLoop : IDisposable
                     dismissedDark = 0;
                     if (bright) { brightStreak++; darkStreak = 0; } else { darkStreak++; brightStreak = 0; }
                     bool wasUp = panelUp;
-                    if (!panelUp && brightStreak >= FramesToOpen) panelUp = true;
+                    if (!panelUp && brightStreak >= FramesToOpen) { panelUp = true; panelUpAt = Environment.TickCount64; }
                     else if (panelUp && darkStreak >= FramesToClose) panelUp = false;
                     if (panelUp != wasUp) Log($"panel {(panelUp ? "up" : "down")} lum={lum}");
 
@@ -132,7 +137,9 @@ public sealed class ScanLoop : IDisposable
                     }
 
                     _visible = confirmed;
-                    OverlayHost.Update(confirmed ? rows : [], showReadingHint: panelUp && !confirmed);
+                    bool hint = panelUp && !confirmed
+                                && Environment.TickCount64 - panelUpAt < ReadingHintWindowMs;
+                    OverlayHost.Update(confirmed ? rows : [], showReadingHint: hint);
                     if (++frame % TopmostEveryFrames == 0) OverlayHost.ReassertTopmost();
                 }
             }
