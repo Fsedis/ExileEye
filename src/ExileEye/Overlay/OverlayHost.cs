@@ -47,6 +47,9 @@ public static class OverlayHost
     public static void Update(IReadOnlyList<DisplayRow> rows, bool showReadingHint) =>
         Invoke(w => w.Render(rows, showReadingHint));
 
+    public static void SetIcons(System.Drawing.Bitmap? divine, System.Drawing.Bitmap? exalted) =>
+        Invoke(w => w.SetIcons(divine, exalted));
+
     public static void Clear() => Invoke(w => w.Render([], false));
 
     public static void ReassertTopmost() => Invoke(w => w.ReassertTopmost());

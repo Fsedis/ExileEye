@@ -19,16 +19,17 @@ starts/stops, `Esc` or `Ctrl+Click` hides the overlay.
 
 - Live prices next to each panel row, stack-aware (`2.4 (0.4 ea)`) — both the
   exchange panel's `14x` prefix and the combinations panel's `(6)` suffix
+- Divine / Exalted orb icons in the overlay (cached for offline launches)
 - English & Russian clients (the Russian OCR model downloads on first use)
+- League list pulled live from poe.ninja — new leagues appear automatically
 - Exact → prefix → fuzzy name matching that shrugs off OCR misreads
 - One-drag region calibration, Fluent settings window
 
 ## Planned
 
-- First-run wizard, auto-detected league list
+- First-run wizard
 - Tray icon, localized UI (ru/en)
 - One-click installer with auto-updates (Velopack)
-- Currency icons in the overlay instead of `div`/`ex` text
 
 ## Build from source
 

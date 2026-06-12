@@ -23,6 +23,7 @@ public sealed class ScanLoop : IDisposable
 
     private readonly Settings _settings;
     private readonly PriceBook _prices;
+    private readonly IconStore? _icons;
     private readonly string _logPath = Path.Combine(AppContext.BaseDirectory, "scan.log");
     private CancellationTokenSource? _cts;
     private Task? _task;
@@ -36,10 +37,11 @@ public sealed class ScanLoop : IDisposable
     public static bool IsOverlayVisible => _visible;
     public static void Dismiss() => _dismissed = true;
 
-    public ScanLoop(Settings settings, PriceBook prices)
+    public ScanLoop(Settings settings, PriceBook prices, IconStore? icons = null)
     {
         _settings = settings;
         _prices = prices;
+        _icons = icons;
     }
 
     public void Start()
@@ -77,6 +79,7 @@ public sealed class ScanLoop : IDisposable
         using var ocr = new OcrReader(TessdataFetcher.TessdataDir, _settings.Language, Log);
         var tracker = new RowTracker(Log);
         OverlayHost.Show(_settings.Region, _settings.OverlayGap);
+        OverlayHost.SetIcons(_icons?.Divine, _icons?.Exalted);
 
         bool panelUp = false, confirmed = false;
         int brightStreak = 0, darkStreak = 0, dismissedDark = 0, frame = 0;

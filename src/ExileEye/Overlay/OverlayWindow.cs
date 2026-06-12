@@ -24,6 +24,9 @@ internal sealed class OverlayWindow : Form
     private readonly Font _font = new("Segoe UI", 11f, FontStyle.Bold);
     private Rectangle _anchor;   // the calibrated game-panel region this strip docks to
     private int _gap;
+    private Bitmap? _divineIcon;
+    private Bitmap? _exaltedIcon;
+    private const int IconSize = 20;
 
     public OverlayWindow()
     {
@@ -54,6 +57,13 @@ internal sealed class OverlayWindow : Form
         Bounds = new Rectangle(anchor.Right + gap, anchor.Y, LabelWidth, anchor.Height);
     }
 
+    /// <summary>Currency sprites; either may be null → that currency falls back to text.</summary>
+    public void SetIcons(Bitmap? divine, Bitmap? exalted)
+    {
+        _divineIcon = divine;
+        _exaltedIcon = exalted;
+    }
+
     /// <summary>Repaint the strip. Empty rows + no hint → fully transparent (invisible).</summary>
     public void Render(IReadOnlyList<DisplayRow> rows, bool showReadingHint)
     {
@@ -77,31 +87,38 @@ internal sealed class OverlayWindow : Form
                 decimal unit = useDivine ? row.Price.Divine : row.Price.Exalted;
                 decimal total = unit * row.Quantity;
                 string fmt = useDivine ? "0.00" : "0.#";
+                var icon = useDivine ? _divineIcon : _exaltedIcon;
                 // Always dot-decimal: PoE prices are written that way everywhere, and it avoids
                 // "0,1" confusion on comma-decimal locales.
                 string text = row.Quantity > 1
-                    ? $"{total.ToString(fmt, CultureInfo.InvariantCulture)} ({unit.ToString(fmt, CultureInfo.InvariantCulture)} ea) {(useDivine ? "div" : "ex")}"
-                    : $"{total.ToString(fmt, CultureInfo.InvariantCulture)} {(useDivine ? "div" : "ex")}";
+                    ? $"{total.ToString(fmt, CultureInfo.InvariantCulture)} ({unit.ToString(fmt, CultureInfo.InvariantCulture)} ea)"
+                    : total.ToString(fmt, CultureInfo.InvariantCulture);
+                if (icon is null) text += useDivine ? " div" : " ex";   // no sprite → text suffix
 
                 bool isTop = top > 0 && row.Price.Divine * row.Quantity == top;
-                DrawLabel(g, row.CenterY, text, isTop ? TopValueColor : useDivine ? DivineColor : ExaltedColor);
+                DrawLabel(g, row.CenterY, text,
+                    isTop ? TopValueColor : useDivine ? DivineColor : ExaltedColor, icon);
             }
         }
         Push(canvas);
     }
 
-    private void DrawLabel(Graphics g, int centerY, string text, Color color)
+    private void DrawLabel(Graphics g, int centerY, string text, Color color, Bitmap? icon = null)
     {
         var size = g.MeasureString(text, _font);
-        var plate = new RectangleF(0, centerY - size.Height / 2 - 3, size.Width + 12, size.Height + 6);
+        float iconSpan = icon is null ? 0 : IconSize + 3;
+        float h = Math.Max(size.Height, icon is null ? 0 : IconSize) + 6;
+        var plate = new RectangleF(0, centerY - h / 2, iconSpan + size.Width + 12, h);
         if (plate.Bottom > Height) plate.Y = Height - plate.Height;
         if (plate.Y < 0) plate.Y = 0;
 
         using (var path = RoundedRect(plate, 6))
         using (var bg = new SolidBrush(Color.FromArgb(150, 18, 18, 24)))
             g.FillPath(bg, path);
+        if (icon is not null)
+            g.DrawImage(icon, plate.X + 5, plate.Y + (h - IconSize) / 2, IconSize, IconSize);
         using var fg = new SolidBrush(color);
-        g.DrawString(text, _font, fg, plate.X + 6, plate.Y + 3);
+        g.DrawString(text, _font, fg, plate.X + 5 + iconSpan, plate.Y + (h - size.Height) / 2);
     }
 
     private static GraphicsPath RoundedRect(RectangleF r, float radius)

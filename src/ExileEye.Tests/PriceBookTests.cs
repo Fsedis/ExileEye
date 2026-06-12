@@ -59,6 +59,31 @@ public class PriceBookTests
     }
 
     [Fact]
+    public void ParseCurrencyIcons_FindsBothSprites()
+    {
+        const string json = """
+            {
+              "items": [
+                { "id": "exalted", "name": "Exalted Orb", "image": "/gen/image/ex.png" },
+                { "id": "divine", "name": "Divine Orb", "image": "/gen/image/div.png" },
+                { "id": "chaos", "name": "Chaos Orb", "image": "/gen/image/chaos.png" }
+              ]
+            }
+            """;
+        var (divine, exalted) = PriceBook.ParseCurrencyIcons(json);
+        Assert.Equal("/gen/image/div.png", divine);
+        Assert.Equal("/gen/image/ex.png", exalted);
+    }
+
+    [Fact]
+    public void ParseCurrencyIcons_Garbage_ReturnsNulls()
+    {
+        var (divine, exalted) = PriceBook.ParseCurrencyIcons("nope");
+        Assert.Null(divine);
+        Assert.Null(exalted);
+    }
+
+    [Fact]
     public void AddAliases_CopiesPriceUnderLocalizedKey()
     {
         var book = new Dictionary<string, Price> { ["chilling flux"] = new(0.5m, 40m) };

@@ -27,6 +27,10 @@ public sealed class PriceBook : IDisposable
     public DateTime? FetchedAt { get; private set; }
     public int Count => _prices.Count;
 
+    /// <summary>CDN paths of the Divine / Exalted orb sprites, captured from the Currency overview.</summary>
+    public string? DivineIconUrl { get; private set; }
+    public string? ExaltedIconUrl { get; private set; }
+
     /// <summary>Fires on a thread-pool thread after each successful fetch.</summary>
     public event Action? Updated;
 
@@ -43,6 +47,8 @@ public sealed class PriceBook : IDisposable
                 if (json is null) continue;
                 foreach (var (key, price) in ParseOverview(json))
                     book[key] = price;
+                if (type == "Currency")
+                    (DivineIconUrl, ExaltedIconUrl) = ParseCurrencyIcons(json);
             }
             if (settings.Language == "ru")
                 AddAliases(book, LoadRussianNames());
@@ -131,6 +137,29 @@ public sealed class PriceBook : IDisposable
             Console.Error.WriteLine($"[PriceBook] parse failed: {ex.Message}");
         }
         return book;
+    }
+
+    /// <summary>Sprite paths for the two display currencies, from the Currency overview's items[].</summary>
+    internal static (string? Divine, string? Exalted) ParseCurrencyIcons(string json)
+    {
+        string? divine = null, exalted = null;
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            if (!doc.RootElement.TryGetProperty("items", out var items)) return (null, null);
+            foreach (var item in items.EnumerateArray())
+            {
+                if (!item.TryGetProperty("id", out var idEl) || idEl.GetString() is not { } id) continue;
+                if (id is not ("divine" or "exalted")) continue;
+                var url = item.TryGetProperty("image", out var img) ? img.GetString() : null;
+                if (id == "divine") divine = url; else exalted = url;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[PriceBook] icon parse failed: {ex.Message}");
+        }
+        return (divine, exalted);
     }
 
     /// <summary>data/ru-names.json: English display name → official Russian client name.</summary>

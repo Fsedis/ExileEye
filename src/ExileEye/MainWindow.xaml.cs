@@ -11,6 +11,7 @@ public partial class MainWindow : FluentWindow
     private readonly HttpClient _http = new();
     private Settings _settings = new();
     private PriceBook? _prices;
+    private IconStore? _icons;
     private ScanLoop? _loop;
     private bool _populating;
 
@@ -30,13 +31,32 @@ public partial class MainWindow : FluentWindow
         LanguageBox.ItemsSource = Settings.Languages.Select(l => l.Label);
         LanguageBox.SelectedIndex = Math.Max(0,
             Array.FindIndex(Settings.Languages, l => l.Code == _settings.Language));
-        LeagueBox.ItemsSource = Settings.Leagues;
-        LeagueBox.SelectedItem = Settings.Leagues.Contains(_settings.League)
-            ? _settings.League : Settings.Leagues[0];
+        PopulateLeagues(Settings.Leagues);
         _populating = false;
 
         RefreshRegionLabel();
+
+        // Live league list and the price fetch run together; the dropdown quietly upgrades from
+        // the built-in fallback once poe.ninja answers.
+        var leaguesTask = LeagueDirectory.FetchAsync(_http);
         await ReloadPricesAsync();
+        var leagues = await leaguesTask;
+        if (leagues.Count > 0)
+        {
+            _populating = true;
+            PopulateLeagues(leagues);
+            _populating = false;
+        }
+    }
+
+    private void PopulateLeagues(IReadOnlyList<string> leagues)
+    {
+        // The saved league stays selectable even if poe.ninja no longer lists it.
+        var list = leagues.Contains(_settings.League)
+            ? leagues
+            : [.. leagues, _settings.League];
+        LeagueBox.ItemsSource = list;
+        LeagueBox.SelectedItem = _settings.League;
     }
 
     private async Task ReloadPricesAsync()
@@ -51,6 +71,11 @@ public partial class MainWindow : FluentWindow
         var ocrModel = TessdataFetcher.EnsureAsync(_settings.Language, _http);
         await Task.WhenAll(_prices.FetchAsync(_settings), ocrModel);
         _prices.StartAutoRefresh(_settings);
+
+        // Overlay currency sprites (cached on disk; falls back to "div"/"ex" text when absent).
+        _icons?.Dispose();
+        _icons = new IconStore();
+        await _icons.LoadAsync(_http, _prices.DivineIconUrl, _prices.ExaltedIconUrl);
 
         if (!ocrModel.Result)
         {
@@ -120,7 +145,7 @@ public partial class MainWindow : FluentWindow
     {
         if (_loop is not null || _prices is null || !_settings.IsCalibrated) return;
         if (!TessdataFetcher.HasLanguage(_settings.Language)) return;
-        _loop = new ScanLoop(_settings, _prices);
+        _loop = new ScanLoop(_settings, _prices, _icons);
         _loop.Start();
         StartStopButton.Content = "Stop  (F5)";
         StartStopButton.Icon = new SymbolIcon(SymbolRegular.Stop24);
@@ -161,6 +186,7 @@ public partial class MainWindow : FluentWindow
     {
         StopLoop();
         _prices?.Dispose();
+        _icons?.Dispose();
         _http.Dispose();
         System.Windows.Application.Current.Shutdown();
     }
