@@ -161,10 +161,10 @@ public partial class MainWindow : FluentWindow
     /// </summary>
     private async void OnTestCopy(object sender, RoutedEventArgs e)
     {
-        for (int s = 3; s > 0; s--)
+        for (int s = 5; s > 0; s--)
         {
             SetStatus(InfoBarSeverity.Informational, "Test copy",
-                $"Switch to the game and hover an item… {s}");
+                $"Switch to the game and hover an item with the tooltip showing… {s}");
             await Task.Delay(1000);
         }
         string? backup = SafeClipboardText();
@@ -179,7 +179,7 @@ public partial class MainWindow : FluentWindow
             if (ItemParser.IsPoeItem(now)) { copied = now; break; }
             if (now.Length > 0 && now != backup) copied = now;   // got *something*, even if unrecognized
         }
-        DumpClipboardDebug(backup, copied);
+        DumpClipboardDebug(backup, copied, injected);
         RestoreClipboard(backup);
 
         // `injected` is how many key events the OS accepted: 0 ⇒ input was blocked (run as admin);
@@ -310,14 +310,15 @@ public partial class MainWindow : FluentWindow
 
     // Records what F7 actually copied, so a failure can be diagnosed from the bytes (empty =>
     // input injection / admin; non-empty but unparsed => parser/language).
-    private static void DumpClipboardDebug(string? backup, string copied)
+    private static void DumpClipboardDebug(string? backup, string copied, uint injected = 0)
     {
         try
         {
             var dir = System.IO.Path.Combine(AppContext.BaseDirectory, "debug");
             System.IO.Directory.CreateDirectory(dir);
             var parsed = ItemParser.Parse(copied);
-            var text = $"backup length: {backup?.Length ?? -1}\n" +
+            var text = $"injected events: {injected}\n" +
+                       $"backup length: {backup?.Length ?? -1}\n" +
                        $"copied length: {copied.Length}\n" +
                        $"IsPoeItem: {ItemParser.IsPoeItem(copied)}\n" +
                        $"parsed: name='{parsed?.Name}' type='{parsed?.Type}' rarity='{parsed?.Rarity}' stack={parsed?.StackSize}\n" +
