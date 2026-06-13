@@ -10,6 +10,7 @@ namespace ExileEye;
 public partial class App : System.Windows.Application
 {
     private TaskPoolGlobalHook? _hook;
+    private bool _ctrlDown;
 
     // Only one instance may own the global hook and the overlay.
     private static Mutex? _single;
@@ -49,17 +50,22 @@ public partial class App : System.Windows.Application
         _hook = new TaskPoolGlobalHook();
         _hook.KeyPressed += (_, ev) =>
         {
+            var code = ev.Data.KeyCode;
             // Esc closes the in-game panel — drop the overlay the moment the key goes down.
-            if (ev.Data.KeyCode == KeyCode.VcEscape && ScanLoop.IsOverlayVisible) ScanLoop.Dismiss();
+            if (code == KeyCode.VcEscape && ScanLoop.IsOverlayVisible) ScanLoop.Dismiss();
+            else if (code is KeyCode.VcLeftControl or KeyCode.VcRightControl) _ctrlDown = true;
         };
         _hook.KeyReleased += (_, ev) =>
         {
-            // Toggle on release so key auto-repeat can't fire many toggles.
-            if (ev.Data.KeyCode == KeyCode.VcF5)
-                Current?.Dispatcher.BeginInvoke(() => (Current.MainWindow as MainWindow)?.ToggleLoop());
-            else if (ev.Data.KeyCode == KeyCode.VcF6) ScanLoop.RequestScan();   // on-demand panel scan
-            else if (ev.Data.KeyCode == KeyCode.VcF7)                            // clipboard price check
+            var code = ev.Data.KeyCode;
+            // PoE binds the F-keys (social/AFK etc.), so the in-game actions live on Ctrl combos —
+            // Ctrl+D for the hovered-item price check is the community-standard binding. Trigger on
+            // release so auto-repeat can't fire repeatedly.
+            if (code is KeyCode.VcLeftControl or KeyCode.VcRightControl) _ctrlDown = false;
+            else if (_ctrlDown && code == KeyCode.VcD)
                 Current?.Dispatcher.BeginInvoke(() => (Current.MainWindow as MainWindow)?.TriggerPriceCheck());
+            else if (_ctrlDown && code == KeyCode.VcS)
+                Current?.Dispatcher.BeginInvoke(() => (Current.MainWindow as MainWindow)?.TriggerScan());
         };
         _hook.MousePressed += (_, ev) =>
         {

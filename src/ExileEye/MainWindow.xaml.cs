@@ -95,7 +95,7 @@ public partial class MainWindow : FluentWindow
         if (_prices is null) return;
         string at = _prices.FetchedAt is { } t ? t.ToString("HH:mm") : "—";
         SetStatus(InfoBarSeverity.Success, "Ready",
-            $"{_prices.Count} items priced · updated {at} · F6 scans a panel · F7 prices the hovered item");
+            $"{_prices.Count} items priced · updated {at} · Ctrl+S scans a panel · Ctrl+D prices the hovered item");
     }
 
     private void SetStatus(InfoBarSeverity severity, string title, string message)
@@ -107,11 +107,18 @@ public partial class MainWindow : FluentWindow
 
     private void OnStartStop(object sender, RoutedEventArgs e) => ToggleLoop();
 
-    /// <summary>Shared by the button and the global F5 hook (marshalled to the UI thread).</summary>
+    /// <summary>Shared by the Start/Stop button (and could be a hotkey).</summary>
     internal void ToggleLoop()
     {
         if (_loop is null) StartLoop();
         else StopLoop();
+    }
+
+    /// <summary>Ctrl+S: scan the panel, auto-starting the engine if it isn't running yet.</summary>
+    internal void TriggerScan()
+    {
+        if (_loop is null) StartLoop();
+        ScanLoop.RequestScan();
     }
 
     private void StartLoop()
@@ -120,7 +127,7 @@ public partial class MainWindow : FluentWindow
         if (!TessdataFetcher.HasLanguage(_settings.Language)) return;
         _loop = new ScanLoop(_settings, _prices, _icons);
         _loop.Start();
-        StartStopButton.Content = "Stop  (F5)";
+        StartStopButton.Content = "Stop";
         StartStopButton.Icon = new SymbolIcon(SymbolRegular.Stop24);
         StartStopButton.Appearance = ControlAppearance.Danger;
     }
@@ -130,7 +137,7 @@ public partial class MainWindow : FluentWindow
         if (_loop is null) return false;
         _loop.Dispose();
         _loop = null;
-        StartStopButton.Content = "Start  (F5)";
+        StartStopButton.Content = "Start";
         StartStopButton.Icon = new SymbolIcon(SymbolRegular.Play24);
         StartStopButton.Appearance = ControlAppearance.Primary;
         return true;
