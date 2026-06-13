@@ -42,16 +42,29 @@ public sealed class ScanLoop : IDisposable
     private CancellationTokenSource? _cts;
     private Task? _task;
 
-    // The global Esc / Ctrl+click hook (App) hides the overlay through this latch; F6 raises
-    // the scan request. Static because the hook outlives any single loop instance.
+    // The global Esc / click hook (App) hides the overlay through this latch; F6 raises the scan
+    // request. Static because the hook outlives any single loop instance.
     private static volatile bool _dismissed;
     private static volatile bool _visible;
     private static volatile bool _scanRequested;
+    private static volatile bool _hotkeyMode;
 
     public bool IsRunning => _task is { IsCompleted: false };
     public static bool IsOverlayVisible => _visible;
-    public static void Dismiss() => _dismissed = true;
+    // In on-demand mode the user reads the prices then clicks the item — that click should hide
+    // the overlay. The App hook checks this to know whether a plain click counts as a dismiss.
+    public static bool HotkeyMode => _hotkeyMode;
     public static void RequestScan() => _scanRequested = true;
+
+    public static void Dismiss()
+    {
+        // Hide instantly off the hook thread; the scan loop sees the latch on its next poll and
+        // settles into its hidden state. Without the immediate clear the overlay would linger
+        // up to one poll interval after the click, which is exactly what felt "stuck".
+        _dismissed = true;
+        _visible = false;
+        OverlayHost.Clear();
+    }
 
     public ScanLoop(Settings settings, PriceBook prices, IconStore? icons = null)
     {
@@ -98,6 +111,7 @@ public sealed class ScanLoop : IDisposable
         OverlayHost.SetIcons(_icons?.Divine, _icons?.Exalted);
         _dismissed = false;
         _scanRequested = false;
+        _hotkeyMode = _settings.ScanMode != "auto";
 
         if (_settings.ScanMode == "auto") await RunAutoAsync(ocr, tracker, ct);
         else await RunOnDemandAsync(ocr, tracker, ct);
@@ -156,7 +170,7 @@ public sealed class ScanLoop : IDisposable
         string previousShape = "";
         int agreeing = 0;
 
-        for (int f = 0; f < BurstMaxFrames && !ct.IsCancellationRequested && !_scanRequested; f++)
+        for (int f = 0; f < BurstMaxFrames && !ct.IsCancellationRequested && !_scanRequested && !_dismissed; f++)
         {
             try
             {

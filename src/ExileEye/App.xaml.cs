@@ -46,11 +46,13 @@ public partial class App : System.Windows.Application
             else if (ev.Data.KeyCode == KeyCode.VcF6) ScanLoop.RequestScan();   // on-demand scan
             else if (ev.Data.KeyCode == KeyCode.VcLeftControl) _ctrlDown = false;
         };
-        // Ctrl+click is the in-game purchase gesture — hide the overlay out of the way.
         _hook.MousePressed += (_, ev) =>
         {
-            if (ev.Data.Button == SharpHook.Data.MouseButton.Button1 && _ctrlDown && ScanLoop.IsOverlayVisible)
-                ScanLoop.Dismiss();
+            if (ev.Data.Button != SharpHook.Data.MouseButton.Button1 || !ScanLoop.IsOverlayVisible) return;
+            // On-demand mode: the user has read the prices and is now clicking the item — any
+            // left click dismisses. Continuous mode: only the Ctrl+click purchase gesture, since
+            // plain clicks land on the panel constantly while it stays open.
+            if (ScanLoop.HotkeyMode || _ctrlDown) ScanLoop.Dismiss();
         };
         _ = _hook.RunAsync();
     }
