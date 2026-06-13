@@ -154,6 +154,47 @@ public partial class MainWindow : FluentWindow
         ScanLoop.RequestScan();
     }
 
+    /// <summary>
+    /// Diagnostic: counts down so the user can focus the game and hover an item, sends Ctrl+C
+    /// directly (no hotkey involved), and reports exactly what landed on the clipboard — to tell
+    /// "synthetic input never reaches the game" apart from "the hotkey didn't fire".
+    /// </summary>
+    private async void OnTestCopy(object sender, RoutedEventArgs e)
+    {
+        for (int s = 3; s > 0; s--)
+        {
+            SetStatus(InfoBarSeverity.Informational, "Test copy",
+                $"Switch to the game and hover an item… {s}");
+            await Task.Delay(1000);
+        }
+        string? backup = SafeClipboardText();
+        if (ItemParser.IsPoeItem(backup)) RestoreClipboard("");
+        InputSender.SendCtrlC();
+
+        string copied = "";
+        for (int i = 0; i < 10; i++)
+        {
+            await Task.Delay(55);
+            var now = SafeClipboardText() ?? "";
+            if (ItemParser.IsPoeItem(now)) { copied = now; break; }
+            if (now.Length > 0 && now != backup) copied = now;   // got *something*, even if unrecognized
+        }
+        DumpClipboardDebug(backup, copied);
+        RestoreClipboard(backup);
+
+        if (copied.Length == 0)
+            SetStatus(InfoBarSeverity.Error, "Test copy: nothing copied",
+                "Ctrl+C didn't reach the game. Use borderless/windowed mode and run ExileEye as admin.");
+        else
+        {
+            string first = copied.Split('\n')[0].Trim();
+            bool ok = ItemParser.IsPoeItem(copied);
+            SetStatus(ok ? InfoBarSeverity.Success : InfoBarSeverity.Warning,
+                $"Test copy: {copied.Length} chars{(ok ? " (item recognized)" : " (not recognized)")}",
+                $"first line: {first}");
+        }
+    }
+
     private void StartLoop()
     {
         if (_loop is not null || _prices is null) return;
@@ -216,7 +257,7 @@ public partial class MainWindow : FluentWindow
             string? backup = SafeClipboardText();
             // Clear first so the poll can tell a fresh copy from stale content (EE2 does this).
             if (ItemParser.IsPoeItem(backup)) RestoreClipboard("");
-            InputSender.SendItemCopy();
+            InputSender.SendCtrlC();
             // Poll until the game writes item text (copy latency varies), up to ~0.5s.
             string copied = "";
             for (int i = 0; i < 9; i++)
