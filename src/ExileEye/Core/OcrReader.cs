@@ -10,6 +10,10 @@ namespace ExileEye.Core;
 /// <summary>One recognized panel row: parsed name + stack quantity at a vertical position.</summary>
 public sealed record OcrLine(string Name, int Quantity, string RawText, int CenterY);
 
+/// <summary>A recognized line with its full bounding box (image coords) — used by full-window
+/// locating to compute where the panel sits on screen.</summary>
+public sealed record LocatedLine(string Name, int Quantity, string RawText, int Left, int Right, int CenterY);
+
 /// <summary>
 /// Tesseract front-end tuned for PoE2 list panels. Two engines run two segmentation passes
 /// concurrently (engines are single-threaded internally): SingleColumn reads clean lists,
@@ -64,6 +68,44 @@ public sealed class OcrReader : IDisposable
         Task.WaitAll(colPass, sparsePass);
 
         return MergePasses(colPass.Result, sparsePass.Result);
+    }
+
+    /// <summary>
+    /// Locate text anywhere in a full-window capture (no region cropping/trimming/inversion — the
+    /// screen is mostly the dark game world, so the per-region polarity heuristic doesn't apply).
+    /// Returns every plausible line with its bounding box, so the caller can match names against
+    /// the price book and bound the panel from the rows that hit. Auto page segmentation finds
+    /// text blocks scattered across the screen.
+    /// </summary>
+    public IReadOnlyList<LocatedLine> ReadFull(Bitmap window)
+    {
+        using var work = new Bitmap(window.Width * Upscale, window.Height * Upscale, PixelFormat.Format24bppRgb);
+        using (var g = Graphics.FromImage(work))
+        {
+            g.InterpolationMode = InterpolationMode.HighQualityBicubic;
+            g.DrawImage(window, new Rectangle(0, 0, work.Width, work.Height));
+        }
+        byte[] png;
+        using (var ms = new MemoryStream()) { work.Save(ms, System.Drawing.Imaging.ImageFormat.Png); png = ms.ToArray(); }
+
+        var lines = new List<LocatedLine>();
+        using var pix = Pix.LoadFromMemory(png);
+        using var page = _columnEngine.Process(pix, PageSegMode.SparseText);
+        using var iter = page.GetIterator();
+        iter.Begin();
+        do
+        {
+            if (!iter.TryGetBoundingBox(PageIteratorLevel.TextLine, out var box)) continue;
+            var text = iter.GetText(PageIteratorLevel.TextLine);
+            if (string.IsNullOrWhiteSpace(text)) continue;
+            if (iter.GetConfidence(PageIteratorLevel.TextLine) < MinLineConfidence) continue;
+            var parsed = ItemText.Parse(text);
+            if (!ItemText.LooksLikeName(parsed.Name)) continue;
+            lines.Add(new LocatedLine(parsed.Name, parsed.Quantity, text.Trim(),
+                box.X1 / Upscale, box.X2 / Upscale, (box.Y1 + box.Y2) / 2 / Upscale));
+        }
+        while (iter.Next(PageIteratorLevel.TextLine));
+        return lines;
     }
 
     /// <summary>
