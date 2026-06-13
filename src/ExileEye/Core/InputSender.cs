@@ -39,17 +39,35 @@ public static class InputSender
     [DllImport("user32.dll", SetLastError = true)]
     private static extern uint SendInput(uint count, INPUT[] inputs, int size);
 
+    // The union must be sized to its LARGEST member (MOUSEINPUT), or sizeof(INPUT) is wrong and
+    // SendInput rejects every event (returns 0). This was the bug: with only KEYBDINPUT the struct
+    // came out 32 bytes on x64 instead of the required 40.
     [StructLayout(LayoutKind.Sequential)]
     private struct INPUT { public uint type; public InputUnion u; }
 
     [StructLayout(LayoutKind.Explicit)]
-    private struct InputUnion { [FieldOffset(0)] public KEYBDINPUT ki; }
+    private struct InputUnion
+    {
+        [FieldOffset(0)] public MOUSEINPUT mi;
+        [FieldOffset(0)] public KEYBDINPUT ki;
+    }
 
     [StructLayout(LayoutKind.Sequential)]
     private struct KEYBDINPUT
     {
         public ushort wVk;
         public ushort wScan;
+        public uint dwFlags;
+        public uint time;
+        public IntPtr dwExtraInfo;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct MOUSEINPUT
+    {
+        public int dx;
+        public int dy;
+        public uint mouseData;
         public uint dwFlags;
         public uint time;
         public IntPtr dwExtraInfo;
