@@ -3,27 +3,26 @@ using System.Runtime.InteropServices;
 namespace ExileEye.Core;
 
 /// <summary>
-/// Synthesises the Ctrl+C the game needs to copy the hovered item to the clipboard. Uses
-/// SendInput with hardware scan codes — PoE reads raw input, and a vk-only keybd_event is often
-/// ignored. (If the game runs elevated and ExileEye does not, Windows blocks synthetic input to
-/// it entirely; ExileEye then needs to run as administrator too.)
+/// Triggers the game's "copy hovered item" the way Exiled Exchange 2 does (MIT — see THIRD-PARTY):
+/// the price-check hotkey is Ctrl+D, so when it fires the user is already holding Ctrl. We release
+/// the non-modifier key (D) and then tap C — Ctrl is still physically held, so the game sees a
+/// clean Ctrl+C. Blasting a full synthetic Ctrl+C instead fails, because D is still down and the
+/// game sees Ctrl+D+C. Uses SendInput with hardware scan codes (PoE reads raw input).
+/// (If the game runs elevated, ExileEye must run elevated too, or Windows blocks the input.)
 /// </summary>
 public static class InputSender
 {
-    private const ushort ScanLCtrl = 0x1D;
+    private const ushort ScanD = 0x20;
     private const ushort ScanC = 0x2E;
 
-    public static void SendCtrlC()
+    public static void SendItemCopy()
     {
-        var inputs = new[]
-        {
-            Key(ScanLCtrl, down: true),
-            Key(ScanC, down: true),
-            Key(ScanC, down: false),
-            Key(ScanLCtrl, down: false),
-        };
-        SendInput((uint)inputs.Length, inputs, Marshal.SizeOf<INPUT>());
+        Send(Key(ScanD, down: false));                       // release the held hotkey letter
+        Send(Key(ScanC, down: true), Key(ScanC, down: false)); // tap C (Ctrl still held by the user)
     }
+
+    private static void Send(params INPUT[] inputs) =>
+        SendInput((uint)inputs.Length, inputs, Marshal.SizeOf<INPUT>());
 
     private static INPUT Key(ushort scan, bool down) => new()
     {

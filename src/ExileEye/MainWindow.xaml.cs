@@ -1,5 +1,7 @@
 using System.Net.Http;
+using System.Runtime.InteropServices;
 using System.Windows;
+using System.Windows.Interop;
 using ExileEye.Core;
 using ExileEye.Overlay;
 using Wpf.Ui.Controls;
@@ -8,6 +10,16 @@ namespace ExileEye;
 
 public partial class MainWindow : FluentWindow
 {
+    // Global hotkeys, registered with the game so it doesn't also act on them (like EE2's
+    // globalShortcut). MOD_CONTROL | MOD_NOREPEAT; Ctrl+D price check, Ctrl+S panel scan.
+    [DllImport("user32.dll")] private static extern bool RegisterHotKey(IntPtr hWnd, int id, uint mod, uint vk);
+    [DllImport("user32.dll")] private static extern bool UnregisterHotKey(IntPtr hWnd, int id);
+    private const uint MOD_CONTROL = 0x2, MOD_NOREPEAT = 0x4000;
+    private const int WM_HOTKEY = 0x0312;
+    private const int HotkeyPrice = 1, HotkeyScan = 2;
+    private const uint VK_D = 0x44, VK_S = 0x53;
+    private IntPtr _hwnd;
+
     private readonly HttpClient _http = new();
     private Settings _settings = new();
     private PriceBook? _prices;
@@ -23,6 +35,27 @@ public partial class MainWindow : FluentWindow
         var v = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
         if (v is not null) VersionLabel.Text = $"v{v.Major}.{v.Minor}.{v.Build}";
         Loaded += async (_, _) => await InitializeAsync();
+        SourceInitialized += OnSourceInitialized;
+    }
+
+    private void OnSourceInitialized(object? sender, EventArgs e)
+    {
+        _hwnd = new WindowInteropHelper(this).Handle;
+        HwndSource.FromHwnd(_hwnd)?.AddHook(WndProc);
+        if (!RegisterHotKey(_hwnd, HotkeyPrice, MOD_CONTROL | MOD_NOREPEAT, VK_D))
+            Console.Error.WriteLine("[Hotkey] Ctrl+D unavailable (held by another app)");
+        if (!RegisterHotKey(_hwnd, HotkeyScan, MOD_CONTROL | MOD_NOREPEAT, VK_S))
+            Console.Error.WriteLine("[Hotkey] Ctrl+S unavailable (held by another app)");
+    }
+
+    private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        if (msg == WM_HOTKEY)
+        {
+            if (wParam.ToInt32() == HotkeyPrice) { TriggerPriceCheck(); handled = true; }
+            else if (wParam.ToInt32() == HotkeyScan) { TriggerScan(); handled = true; }
+        }
+        return IntPtr.Zero;
     }
 
     private async Task InitializeAsync()
@@ -183,7 +216,7 @@ public partial class MainWindow : FluentWindow
             string? backup = SafeClipboardText();
             // Clear first so the poll can tell a fresh copy from stale content (EE2 does this).
             if (ItemParser.IsPoeItem(backup)) RestoreClipboard("");
-            InputSender.SendCtrlC();
+            InputSender.SendItemCopy();
             // Poll until the game writes item text (copy latency varies), up to ~0.5s.
             string copied = "";
             for (int i = 0; i < 9; i++)
@@ -262,6 +295,11 @@ public partial class MainWindow : FluentWindow
 
     private void OnClosing(object sender, System.ComponentModel.CancelEventArgs e)
     {
+        if (_hwnd != IntPtr.Zero)
+        {
+            UnregisterHotKey(_hwnd, HotkeyPrice);
+            UnregisterHotKey(_hwnd, HotkeyScan);
+        }
         StopLoop();
         _prices?.Dispose();
         _icons?.Dispose();
