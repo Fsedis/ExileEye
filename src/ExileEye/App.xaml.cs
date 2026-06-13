@@ -10,7 +10,6 @@ namespace ExileEye;
 public partial class App : System.Windows.Application
 {
     private TaskPoolGlobalHook? _hook;
-    private bool _ctrlDown;
 
     // Only one instance may own the global hook and the overlay.
     private static Mutex? _single;
@@ -36,7 +35,6 @@ public partial class App : System.Windows.Application
         {
             // Esc closes the in-game panel — drop the overlay the moment the key goes down.
             if (ev.Data.KeyCode == KeyCode.VcEscape && ScanLoop.IsOverlayVisible) ScanLoop.Dismiss();
-            else if (ev.Data.KeyCode == KeyCode.VcLeftControl) _ctrlDown = true;
         };
         _hook.KeyReleased += (_, ev) =>
         {
@@ -44,15 +42,12 @@ public partial class App : System.Windows.Application
             if (ev.Data.KeyCode == KeyCode.VcF5)
                 Current?.Dispatcher.BeginInvoke(() => (Current.MainWindow as MainWindow)?.ToggleLoop());
             else if (ev.Data.KeyCode == KeyCode.VcF6) ScanLoop.RequestScan();   // on-demand scan
-            else if (ev.Data.KeyCode == KeyCode.VcLeftControl) _ctrlDown = false;
         };
         _hook.MousePressed += (_, ev) =>
         {
-            if (ev.Data.Button != SharpHook.Data.MouseButton.Button1 || !ScanLoop.IsOverlayVisible) return;
-            // On-demand mode: the user has read the prices and is now clicking the item — any
-            // left click dismisses. Continuous mode: only the Ctrl+click purchase gesture, since
-            // plain clicks land on the panel constantly while it stays open.
-            if (ScanLoop.HotkeyMode || _ctrlDown) ScanLoop.Dismiss();
+            // The user has read the prices and is now clicking the item — any left click dismisses.
+            if (ev.Data.Button == SharpHook.Data.MouseButton.Button1 && ScanLoop.IsOverlayVisible)
+                ScanLoop.Dismiss();
         };
         _ = _hook.RunAsync();
     }
