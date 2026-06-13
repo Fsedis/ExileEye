@@ -174,22 +174,28 @@ public partial class MainWindow : FluentWindow
             var green = System.Drawing.Color.FromArgb(96, 255, 128);
 
             string? backup = SafeClipboardText();
+            // Clear first so the poll can tell a fresh copy from stale content (EE2 does this).
+            if (ItemParser.IsPoeItem(backup)) RestoreClipboard("");
             InputSender.SendCtrlC();
-            // Poll until the game replaces the clipboard (or give up) — more reliable than a
-            // fixed wait, since copy latency varies.
+            // Poll until the game writes item text (copy latency varies), up to ~0.5s.
             string copied = "";
-            for (int i = 0; i < 8; i++)
+            for (int i = 0; i < 9; i++)
             {
-                await Task.Delay(60);
-                var now = SafeClipboardText();
-                if (!string.IsNullOrEmpty(now) && now != backup) { copied = now; break; }
+                await Task.Delay(55);
+                var now = SafeClipboardText() ?? "";
+                if (ItemParser.IsPoeItem(now)) { copied = now; break; }
             }
+
+            DumpClipboardDebug(backup, copied);
 
             var item = ItemParser.Parse(copied);
             if (item is null || !item.IsSearchable)
             {
                 RestoreClipboard(backup);
-                PriceToast.Show(System.Windows.Forms.Cursor.Position, "ExileEye", "Hover an item, then press F7", grey);
+                string why = string.IsNullOrEmpty(copied)
+                    ? "couldn't copy — try running ExileEye as admin"
+                    : "not a recognized item";
+                PriceToast.Show(System.Windows.Forms.Cursor.Position, "ExileEye", why, grey);
                 return;
             }
 
@@ -215,6 +221,25 @@ public partial class MainWindow : FluentWindow
 
     private static string Format(decimal d) =>
         d.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+
+    // Records what F7 actually copied, so a failure can be diagnosed from the bytes (empty =>
+    // input injection / admin; non-empty but unparsed => parser/language).
+    private static void DumpClipboardDebug(string? backup, string copied)
+    {
+        try
+        {
+            var dir = System.IO.Path.Combine(AppContext.BaseDirectory, "debug");
+            System.IO.Directory.CreateDirectory(dir);
+            var parsed = ItemParser.Parse(copied);
+            var text = $"backup length: {backup?.Length ?? -1}\n" +
+                       $"copied length: {copied.Length}\n" +
+                       $"IsPoeItem: {ItemParser.IsPoeItem(copied)}\n" +
+                       $"parsed: name='{parsed?.Name}' type='{parsed?.Type}' rarity='{parsed?.Rarity}' stack={parsed?.StackSize}\n" +
+                       "---- copied text ----\n" + copied;
+            System.IO.File.WriteAllText(System.IO.Path.Combine(dir, "clipboard.txt"), text);
+        }
+        catch { /* best-effort diagnostic */ }
+    }
 
     private static string? SafeClipboardText()
     {
