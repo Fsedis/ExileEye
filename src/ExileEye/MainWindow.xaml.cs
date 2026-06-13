@@ -175,8 +175,15 @@ public partial class MainWindow : FluentWindow
 
             string? backup = SafeClipboardText();
             InputSender.SendCtrlC();
-            await Task.Delay(110);   // let the game put the item text on the clipboard
-            string copied = SafeClipboardText() ?? "";
+            // Poll until the game replaces the clipboard (or give up) — more reliable than a
+            // fixed wait, since copy latency varies.
+            string copied = "";
+            for (int i = 0; i < 8; i++)
+            {
+                await Task.Delay(60);
+                var now = SafeClipboardText();
+                if (!string.IsNullOrEmpty(now) && now != backup) { copied = now; break; }
+            }
 
             var item = ItemParser.Parse(copied);
             if (item is null || !item.IsSearchable)
