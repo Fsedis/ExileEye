@@ -14,11 +14,11 @@ public partial class MainWindow : FluentWindow
     // globalShortcut). MOD_CONTROL | MOD_NOREPEAT; Ctrl+D price check, Ctrl+S panel scan.
     [DllImport("user32.dll")] private static extern bool RegisterHotKey(IntPtr hWnd, int id, uint mod, uint vk);
     [DllImport("user32.dll")] private static extern bool UnregisterHotKey(IntPtr hWnd, int id);
-    private const uint MOD_CONTROL = 0x2, MOD_NOREPEAT = 0x4000;
+    private const uint MOD_NOREPEAT = 0x4000;
     private const int WM_HOTKEY = 0x0312;
     private const int HotkeyPrice = 1, HotkeyScan = 2;
-    private const uint VK_D = 0x44, VK_S = 0x53;
     private IntPtr _hwnd;
+    private int _capturing;   // HotkeyPrice / HotkeyScan while waiting for a rebind keypress, else 0
 
     private readonly HttpClient _http = new();
     private Settings _settings = new();
@@ -42,10 +42,70 @@ public partial class MainWindow : FluentWindow
     {
         _hwnd = new WindowInteropHelper(this).Handle;
         HwndSource.FromHwnd(_hwnd)?.AddHook(WndProc);
-        if (!RegisterHotKey(_hwnd, HotkeyPrice, MOD_CONTROL | MOD_NOREPEAT, VK_D))
-            Console.Error.WriteLine("[Hotkey] Ctrl+D unavailable (held by another app)");
-        if (!RegisterHotKey(_hwnd, HotkeyScan, MOD_CONTROL | MOD_NOREPEAT, VK_S))
-            Console.Error.WriteLine("[Hotkey] Ctrl+S unavailable (held by another app)");
+        RegisterHotkeys();
+    }
+
+    private void RegisterHotkeys()
+    {
+        if (_hwnd == IntPtr.Zero) return;
+        UnregisterHotKey(_hwnd, HotkeyPrice);
+        UnregisterHotKey(_hwnd, HotkeyScan);
+        RegisterHotKey(_hwnd, HotkeyPrice, _settings.PriceHotkeyMods | MOD_NOREPEAT, _settings.PriceHotkeyVk);
+        RegisterHotKey(_hwnd, HotkeyScan, _settings.ScanHotkeyMods | MOD_NOREPEAT, _settings.ScanHotkeyVk);
+        RefreshHotkeyLabels();
+    }
+
+    private void RefreshHotkeyLabels()
+    {
+        if (PriceHotkeyText is null) return;   // not yet loaded
+        PriceHotkeyText.Text = FormatHotkey(_settings.PriceHotkeyMods, _settings.PriceHotkeyVk);
+        ScanHotkeyText.Text = FormatHotkey(_settings.ScanHotkeyMods, _settings.ScanHotkeyVk);
+    }
+
+    private static string FormatHotkey(uint mods, uint vk)
+    {
+        var parts = new List<string>();
+        if ((mods & 2) != 0) parts.Add("Ctrl");
+        if ((mods & 1) != 0) parts.Add("Alt");
+        if ((mods & 4) != 0) parts.Add("Shift");
+        if ((mods & 8) != 0) parts.Add("Win");
+        parts.Add(vk == 0 ? "—" : System.Windows.Input.KeyInterop.KeyFromVirtualKey((int)vk).ToString());
+        return string.Join("+", parts);
+    }
+
+    private void OnRebindPrice(object sender, RoutedEventArgs e) => BeginCapture(HotkeyPrice);
+    private void OnRebindScan(object sender, RoutedEventArgs e) => BeginCapture(HotkeyScan);
+
+    private void BeginCapture(int which)
+    {
+        _capturing = which;
+        var label = which == HotkeyPrice ? PriceHotkeyText : ScanHotkeyText;
+        label.Text = "press keys… (Esc to cancel)";
+    }
+
+    // Captures the next key combo while rebinding. Modifier-only presses are ignored so the user
+    // can hold Ctrl/Alt and then tap the letter.
+    protected override void OnPreviewKeyDown(System.Windows.Input.KeyEventArgs e)
+    {
+        if (_capturing == 0) { base.OnPreviewKeyDown(e); return; }
+        var key = e.Key == System.Windows.Input.Key.System ? e.SystemKey : e.Key;
+        if (key is System.Windows.Input.Key.LeftCtrl or System.Windows.Input.Key.RightCtrl
+            or System.Windows.Input.Key.LeftAlt or System.Windows.Input.Key.RightAlt
+            or System.Windows.Input.Key.LeftShift or System.Windows.Input.Key.RightShift
+            or System.Windows.Input.Key.LWin or System.Windows.Input.Key.RWin)
+        { e.Handled = true; return; }   // wait for the real key
+
+        int which = _capturing;
+        _capturing = 0;
+        e.Handled = true;
+        if (key == System.Windows.Input.Key.Escape) { RefreshHotkeyLabels(); return; }
+
+        uint mods = (uint)System.Windows.Input.Keyboard.Modifiers;   // Alt=1,Ctrl=2,Shift=4,Win=8 — matches MOD_*
+        uint vk = (uint)System.Windows.Input.KeyInterop.VirtualKeyFromKey(key);
+        if (which == HotkeyPrice) { _settings.PriceHotkeyMods = mods; _settings.PriceHotkeyVk = vk; }
+        else { _settings.ScanHotkeyMods = mods; _settings.ScanHotkeyVk = vk; }
+        _settings.Save();
+        RegisterHotkeys();
     }
 
     private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
@@ -61,6 +121,7 @@ public partial class MainWindow : FluentWindow
     private async Task InitializeAsync()
     {
         _settings = Settings.Load();
+        RegisterHotkeys();   // SourceInitialized ran with defaults; re-arm with the saved bindings
 
         // Resolve the league list first (one quick call), then fetch prices exactly once for
         // the league that will actually be selected.
@@ -127,8 +188,10 @@ public partial class MainWindow : FluentWindow
     {
         if (_prices is null) return;
         string at = _prices.FetchedAt is { } t ? t.ToString("HH:mm") : "—";
+        string scanKey = FormatHotkey(_settings.ScanHotkeyMods, _settings.ScanHotkeyVk);
+        string priceKey = FormatHotkey(_settings.PriceHotkeyMods, _settings.PriceHotkeyVk);
         SetStatus(InfoBarSeverity.Success, "Ready",
-            $"{_prices.Count} items priced · updated {at} · Ctrl+S scans a panel · Ctrl+D prices the hovered item");
+            $"{_prices.Count} items priced · updated {at} · {scanKey} scans a panel · {priceKey} prices the hovered item");
     }
 
     private void SetStatus(InfoBarSeverity severity, string title, string message)

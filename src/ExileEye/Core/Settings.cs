@@ -21,6 +21,14 @@ public sealed class Settings
     /// <summary>Horizontal gap (px) between the calibrated region's right edge and the price labels.</summary>
     public int OverlayGap { get; set; } = 8;
 
+    // Global hotkeys stored as Win32 RegisterHotKey (modifier flags, virtual-key). Defaults:
+    // Ctrl+D price check, Ctrl+S scan — rebindable, since PoE binds vary (Ctrl+D is move-only).
+    // MOD_CONTROL = 2. D = 0x44, S = 0x53.
+    public uint PriceHotkeyMods { get; set; } = 2;
+    public uint PriceHotkeyVk { get; set; } = 0x44;
+    public uint ScanHotkeyMods { get; set; } = 2;
+    public uint ScanHotkeyVk { get; set; } = 0x53;
+
     [JsonIgnore]
     public Rectangle Region
     {
