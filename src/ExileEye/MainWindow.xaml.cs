@@ -350,7 +350,7 @@ public partial class MainWindow : FluentWindow
 
             var label = item.Name ?? item.Type ?? "?";
             PriceToast.Show(System.Windows.Forms.Cursor.Position, label, "checking price…", accent);
-            var result = await _trade.CheckAsync(item, _settings.League);
+            var result = await _trade.CheckAsync(item, _settings.League, _settings.Language);
             RestoreClipboard(backup);
 
             var at = System.Windows.Forms.Cursor.Position;

@@ -25,11 +25,12 @@ public sealed record PriceCheck(string Label, int Total, IReadOnlyList<Listing> 
 /// <summary>
 /// The official GGG trade API (api/trade2): POST a search, GET the cheapest listings. Public
 /// search works without a session for occasional use; we send a descriptive User-Agent (GGG
-/// asks for one) and back off on 429 rather than hammering.
+/// asks for one) and back off on 429 rather than hammering. The API is localized by subdomain —
+/// a Russian client copies Russian item names, which only the ru. host accepts (the www host
+/// returns 400 "Unknown item base type"), so the host is chosen by client language.
 /// </summary>
 public sealed class TradeClient
 {
-    private const string Base = "https://www.pathofexile.com/api/trade2";
     private const string UserAgent =
         "ExileEye/0.1 (+https://github.com/Fsedis/ExileEye; contact prokrastinatorof@gmail.com)";
     private const int FetchBatch = 10;   // the cheapest N listings is plenty for a price read
@@ -37,12 +38,17 @@ public sealed class TradeClient
     private readonly HttpClient _http;
     public TradeClient(HttpClient http) => _http = http;
 
-    public async Task<PriceCheck?> CheckAsync(ParsedItem item, string league)
+    /// <summary>Trade host for the client language — item names are copied localized.</summary>
+    private static string BaseFor(string language) =>
+        (language == "ru" ? "https://ru.pathofexile.com" : "https://www.pathofexile.com") + "/api/trade2";
+
+    public async Task<PriceCheck?> CheckAsync(ParsedItem item, string league, string language = "en")
     {
         if (!item.IsSearchable) return null;
+        var baseUrl = BaseFor(language);
 
         var query = BuildQuery(item);
-        var searchUrl = $"{Base}/search/{Uri.EscapeDataString(league)}";
+        var searchUrl = $"{baseUrl}/search/{Uri.EscapeDataString(league)}";
         var search = await PostJsonAsync(searchUrl, query);
         if (search is null) return null;
 
@@ -54,7 +60,7 @@ public sealed class TradeClient
             return new PriceCheck(item.Name ?? item.Type ?? "?", total, []);
 
         var ids = resultArr.EnumerateArray().Take(FetchBatch).Select(e => e.GetString()).Where(s => s is not null).ToList();
-        var fetchUrl = $"{Base}/fetch/{string.Join(',', ids)}?query={searchId}";
+        var fetchUrl = $"{baseUrl}/fetch/{string.Join(',', ids)}?query={searchId}";
         var fetched = await GetAsync(fetchUrl);
         if (fetched is null) return new PriceCheck(item.Name ?? item.Type ?? "?", total, []);
 

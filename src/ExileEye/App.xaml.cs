@@ -102,7 +102,7 @@ public partial class App : System.Windows.Application
             lines.Add($"[pricecheck] '{typeOrName}' league='{settings.League}'");
             using var http = new System.Net.Http.HttpClient();
             var client = new TradeClient(http);
-            var result = Task.Run(() => client.CheckAsync(item, settings.League)).GetAwaiter().GetResult();
+            var result = Task.Run(() => client.CheckAsync(item, settings.League, settings.Language)).GetAwaiter().GetResult();
             if (result is null) { lines.Add("  no result (rate-limited or error)"); }
             else
             {
