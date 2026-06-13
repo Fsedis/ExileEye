@@ -57,7 +57,9 @@ public partial class App : System.Windows.Application
             // Toggle on release so key auto-repeat can't fire many toggles.
             if (ev.Data.KeyCode == KeyCode.VcF5)
                 Current?.Dispatcher.BeginInvoke(() => (Current.MainWindow as MainWindow)?.ToggleLoop());
-            else if (ev.Data.KeyCode == KeyCode.VcF6) ScanLoop.RequestScan();   // on-demand scan
+            else if (ev.Data.KeyCode == KeyCode.VcF6) ScanLoop.RequestScan();   // on-demand panel scan
+            else if (ev.Data.KeyCode == KeyCode.VcF7)                            // clipboard price check
+                Current?.Dispatcher.BeginInvoke(() => (Current.MainWindow as MainWindow)?.TriggerPriceCheck());
         };
         _hook.MousePressed += (_, ev) =>
         {

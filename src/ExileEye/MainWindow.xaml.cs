@@ -13,7 +13,9 @@ public partial class MainWindow : FluentWindow
     private PriceBook? _prices;
     private IconStore? _icons;
     private ScanLoop? _loop;
+    private TradeClient? _trade;
     private bool _populating;
+    private bool _priceCheckBusy;
 
     public MainWindow()
     {
@@ -93,7 +95,7 @@ public partial class MainWindow : FluentWindow
         if (_prices is null) return;
         string at = _prices.FetchedAt is { } t ? t.ToString("HH:mm") : "—";
         SetStatus(InfoBarSeverity.Success, "Ready",
-            $"{_prices.Count} items priced · updated {at} · Start, then F6 over a panel · Esc hides");
+            $"{_prices.Count} items priced · updated {at} · F6 scans a panel · F7 prices the hovered item");
     }
 
     private void SetStatus(InfoBarSeverity severity, string title, string message)
@@ -151,6 +153,72 @@ public partial class MainWindow : FluentWindow
         _settings.League = league;
         _settings.Save();
         await ReloadPricesAsync();
+    }
+
+    // ---- clipboard price check (F7) -----------------------------------------------------------
+
+    /// <summary>
+    /// Copy the hovered item (synthetic Ctrl+C), parse it, query the trade API, and pop the price
+    /// next to the cursor. Invoked on the UI thread (STA) so clipboard access is safe; the network
+    /// call is awaited without blocking. The user's clipboard is restored afterwards.
+    /// </summary>
+    internal async void TriggerPriceCheck()
+    {
+        if (_priceCheckBusy || _prices is null) return;
+        _priceCheckBusy = true;
+        try
+        {
+            _trade ??= new TradeClient(_http);
+            var accent = System.Drawing.Color.FromArgb(120, 160, 255);
+            var grey = System.Drawing.Color.FromArgb(150, 150, 150);
+            var green = System.Drawing.Color.FromArgb(96, 255, 128);
+
+            string? backup = SafeClipboardText();
+            InputSender.SendCtrlC();
+            await Task.Delay(110);   // let the game put the item text on the clipboard
+            string copied = SafeClipboardText() ?? "";
+
+            var item = ItemParser.Parse(copied);
+            if (item is null || !item.IsSearchable)
+            {
+                RestoreClipboard(backup);
+                PriceToast.Show(System.Windows.Forms.Cursor.Position, "ExileEye", "Hover an item, then press F7", grey);
+                return;
+            }
+
+            var label = item.Name ?? item.Type ?? "?";
+            PriceToast.Show(System.Windows.Forms.Cursor.Position, label, "checking price…", accent);
+            var result = await _trade.CheckAsync(item, _settings.League);
+            RestoreClipboard(backup);
+
+            var at = System.Windows.Forms.Cursor.Position;
+            if (result is null)
+            {
+                PriceToast.Show(at, label, "no data (rate-limited or offline)", grey);
+                return;
+            }
+            var typ = result.Typical();
+            string body = typ is null
+                ? $"{result.Total} online · no price"
+                : $"{Format(typ.Amount)} {typ.Currency} · {result.Total} online";
+            PriceToast.Show(at, label, body, result.Total > 0 ? green : grey);
+        }
+        finally { _priceCheckBusy = false; }
+    }
+
+    private static string Format(decimal d) =>
+        d.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+
+    private static string? SafeClipboardText()
+    {
+        try { return System.Windows.Clipboard.ContainsText() ? System.Windows.Clipboard.GetText() : null; }
+        catch { return null; }
+    }
+
+    private static void RestoreClipboard(string? text)
+    {
+        try { if (!string.IsNullOrEmpty(text)) System.Windows.Clipboard.SetText(text); }
+        catch { /* clipboard busy — leave it */ }
     }
 
     private void OnClosing(object sender, System.ComponentModel.CancelEventArgs e)
