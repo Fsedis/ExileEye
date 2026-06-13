@@ -43,6 +43,7 @@ public partial class App : System.Windows.Application
             // Toggle on release so key auto-repeat can't fire many toggles.
             if (ev.Data.KeyCode == KeyCode.VcF5)
                 Current?.Dispatcher.BeginInvoke(() => (Current.MainWindow as MainWindow)?.ToggleLoop());
+            else if (ev.Data.KeyCode == KeyCode.VcF6) ScanLoop.RequestScan();   // on-demand scan
             else if (ev.Data.KeyCode == KeyCode.VcLeftControl) _ctrlDown = false;
         };
         // Ctrl+click is the in-game purchase gesture — hide the overlay out of the way.

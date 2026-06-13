@@ -21,6 +21,13 @@ public sealed class Settings
     /// <summary>Horizontal gap (px) between the calibrated region's right edge and the price labels.</summary>
     public int OverlayGap { get; set; } = 8;
 
+    /// <summary>"hotkey" — scan once per F6 press (accurate: the panel is fully open and static,
+    /// no mid-animation frames, no false triggers); "auto" — continuous brightness-gated scanning.</summary>
+    public string ScanMode { get; set; } = "hotkey";
+
+    public static readonly (string Code, string Label)[] ScanModes =
+        [("hotkey", "On demand — F6"), ("auto", "Continuous")];
+
     [JsonIgnore]
     public Rectangle Region
     {

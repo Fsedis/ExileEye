@@ -37,6 +37,9 @@ public partial class MainWindow : FluentWindow
         LanguageBox.ItemsSource = Settings.Languages.Select(l => l.Label);
         LanguageBox.SelectedIndex = Math.Max(0,
             Array.FindIndex(Settings.Languages, l => l.Code == _settings.Language));
+        ScanModeBox.ItemsSource = Settings.ScanModes.Select(m => m.Label);
+        ScanModeBox.SelectedIndex = Math.Max(0,
+            Array.FindIndex(Settings.ScanModes, m => m.Code == _settings.ScanMode));
         PopulateLeagues(leagues.Count > 0 ? leagues : Settings.Leagues);
         _populating = false;
 
@@ -97,8 +100,10 @@ public partial class MainWindow : FluentWindow
     {
         if (_prices is null) return;
         string at = _prices.FetchedAt is { } t ? t.ToString("HH:mm") : "—";
-        SetStatus(InfoBarSeverity.Success, "Ready",
-            $"{_prices.Count} items priced · updated {at} · F5 starts/stops, Esc hides");
+        string keys = _settings.ScanMode == "hotkey"
+            ? "F5 starts/stops · F6 scans the panel · Esc hides"
+            : "F5 starts/stops · Esc hides";
+        SetStatus(InfoBarSeverity.Success, "Ready", $"{_prices.Count} items priced · updated {at} · {keys}");
     }
 
     private void SetStatus(InfoBarSeverity severity, string title, string message)
@@ -157,6 +162,19 @@ public partial class MainWindow : FluentWindow
         StartStopButton.Icon = new SymbolIcon(SymbolRegular.Play24);
         StartStopButton.Appearance = ControlAppearance.Primary;
         return true;
+    }
+
+    private void OnScanModeChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+    {
+        if (_populating || ScanModeBox.SelectedIndex < 0) return;
+        var code = Settings.ScanModes[ScanModeBox.SelectedIndex].Code;
+        if (code == _settings.ScanMode) return;
+        // The loop reads the mode once at start — bounce it if it's running.
+        bool wasRunning = StopLoop();
+        _settings.ScanMode = code;
+        _settings.Save();
+        if (wasRunning) StartLoop();
+        ShowReadyStatus();
     }
 
     private async void OnLanguageChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)

@@ -38,6 +38,7 @@
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
                     <TextBlock Grid.Row="0" Grid.Column="0" Text="Game language" VerticalAlignment="Center" Opacity="0.8"/>
@@ -48,6 +49,11 @@
                     <TextBlock Grid.Row="1" Grid.Column="0" Text="League" VerticalAlignment="Center" Opacity="0.8"/>
                     <ComboBox Grid.Row="1" Grid.Column="1" x:Name="LeagueBox" Margin="0,2"
                               SelectionChanged="OnLeagueChanged"/>
+
+                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Scan trigger" VerticalAlignment="Center" Opacity="0.8"/>
+                    <ComboBox Grid.Row="2" Grid.Column="1" x:Name="ScanModeBox" Margin="0,2"
+                              SelectionChanged="OnScanModeChanged"
+                              ToolTip="On demand: press F6 with the panel open — most accurate. Continuous: prices appear automatically."/>
                 </Grid>
             </ui:Card>
 
