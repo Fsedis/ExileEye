@@ -42,12 +42,13 @@ public sealed class TradeClient
     private static string BaseFor(string language) =>
         (language == "ru" ? "https://ru.pathofexile.com" : "https://www.pathofexile.com") + "/api/trade2";
 
-    public async Task<PriceCheck?> CheckAsync(ParsedItem item, string league, string language = "en")
+    public async Task<PriceCheck?> CheckAsync(ParsedItem item, string league, string language = "en",
+        IReadOnlyList<string>? statIds = null)
     {
         if (!item.IsSearchable) return null;
         var baseUrl = BaseFor(language);
 
-        var query = BuildQuery(item);
+        var query = BuildQuery(item, statIds);
         var searchUrl = $"{baseUrl}/search/{Uri.EscapeDataString(league)}";
         var search = await PostJsonAsync(searchUrl, query);
         if (search is null) return null;
@@ -68,8 +69,10 @@ public sealed class TradeClient
         return new PriceCheck(item.Name ?? item.Type ?? "?", total, listings);
     }
 
-    // {"query":{"status":{"option":"online"}, name?/type?}, "sort":{"price":"asc"}}
-    private static string BuildQuery(ParsedItem item)
+    // {"query":{"status":{"option":"online"}, name?/type?, stats?}, "sort":{"price":"asc"}}
+    // Stat filters are presence-only ("has this mod", any value) — a rough but populated price for
+    // a rare; an exact value search on every mod almost never has comparable listings.
+    private static string BuildQuery(ParsedItem item, IReadOnlyList<string>? statIds)
     {
         var q = new Dictionary<string, object>
         {
@@ -77,6 +80,17 @@ public sealed class TradeClient
         };
         if (!string.IsNullOrEmpty(item.Name)) q["name"] = item.Name;
         if (!string.IsNullOrEmpty(item.Type)) q["type"] = item.Type;
+        if (statIds is { Count: > 0 })
+        {
+            q["stats"] = new[]
+            {
+                new Dictionary<string, object>
+                {
+                    ["type"] = "and",
+                    ["filters"] = statIds.Select(id => new Dictionary<string, object> { ["id"] = id }).ToArray(),
+                },
+            };
+        }
         var payload = new Dictionary<string, object>
         {
             ["query"] = q,

@@ -26,6 +26,7 @@ public partial class MainWindow : FluentWindow
     private IconStore? _icons;
     private ScanLoop? _loop;
     private TradeClient? _trade;
+    private StatDb? _stats;
     private bool _populating;
     private bool _priceCheckBusy;
 
@@ -166,6 +167,10 @@ public partial class MainWindow : FluentWindow
         _icons?.Dispose();
         _icons = new IconStore();
         await _icons.LoadAsync(_http, _prices.DivineIconUrl, _prices.ExaltedIconUrl);
+
+        // Trade stat dictionary for rare-item mod search (cached on disk after first fetch).
+        _stats = new StatDb();
+        await _stats.LoadAsync(_http, _settings.Language);
 
         if (!ocrModel.Result)
         {
@@ -350,7 +355,22 @@ public partial class MainWindow : FluentWindow
 
             var label = item.Name ?? item.Type ?? "?";
             PriceToast.Show(System.Windows.Forms.Cursor.Position, label, "checking price…", accent);
-            var result = await _trade.CheckAsync(item, _settings.League, _settings.Language);
+
+            // For rares, search by the item's mods (presence) so the price reflects the item, not
+            // just its base type; fall back to base-type-only if that combination has no listings.
+            IReadOnlyList<string>? statIds = null;
+            if (item.Rarity == "rare" && _stats is { Count: > 0 })
+            {
+                statIds = copied.Replace("\r", "").Split('\n')
+                    .Select(l => _stats.Match(l.Trim())?.Id)
+                    .Where(id => id is not null).Select(id => id!).Distinct().ToList();
+                if (statIds.Count == 0) statIds = null;
+            }
+
+            var result = await _trade.CheckAsync(item, _settings.League, _settings.Language, statIds);
+            bool byMods = statIds is not null && result is { Total: > 0 };
+            if (statIds is not null && result is { Total: 0 })
+                result = await _trade.CheckAsync(item, _settings.League, _settings.Language);   // base-type fallback
             RestoreClipboard(backup);
 
             var at = System.Windows.Forms.Cursor.Position;
@@ -360,9 +380,10 @@ public partial class MainWindow : FluentWindow
                 return;
             }
             var typ = result.Typical();
+            string scope = byMods ? $"{statIds!.Count} mods" : "base type";
             string body = typ is null
                 ? $"{result.Total} online · no price"
-                : $"{Format(typ.Amount)} {typ.Currency} · {result.Total} online";
+                : $"{Format(typ.Amount)} {typ.Currency} · {result.Total} online · {scope}";
             PriceToast.Show(at, label, body, result.Total > 0 ? green : grey);
         }
         finally { _priceCheckBusy = false; }
