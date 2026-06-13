@@ -27,6 +27,15 @@ public sealed class OcrReader : IDisposable
     private const int Upscale = 2;
     private const int SameRowTolerance = 25;   // px between merged reads of one row
 
+    // Vertical content trim. PoE panels are calibrated tall enough for the busiest case, so a
+    // short list leaves a large empty area below — on the parchment "combinations" book that
+    // empty area is covered in faint map scribbles which wreck Tesseract's layout analysis and
+    // garble the real rows. Text rows show strong horizontal luma gradients (stroke edges); the
+    // scribbles do not, so trimming everything below the last "busy" scanline removes the noise.
+    private const int EdgeGradient = 40;       // |Δluma| that counts as a text-stroke edge
+    private const int RowActivityMin = 8;      // stroke edges on a scanline to call it a text row
+    private const int BottomMargin = 14;       // keep a little below the last row for descenders
+
     private readonly TesseractEngine _columnEngine;
     private readonly TesseractEngine _sparseEngine;
     private readonly Action<string>? _log;
@@ -70,13 +79,18 @@ public sealed class OcrReader : IDisposable
         int right = (int)(region.Width * RightCropFraction);
         int w = Math.Max(1, region.Width - left - right);
 
-        using var work = new Bitmap(w * Upscale, region.Height * Upscale, PixelFormat.Format24bppRgb);
+        // Trim the empty (scribbled) area below the last text row before OCR.
+        int contentBottom = ContentBottom(region, left, w);
+        int h = contentBottom < 0 ? region.Height
+            : Math.Min(region.Height, contentBottom + BottomMargin);
+
+        using var work = new Bitmap(w * Upscale, h * Upscale, PixelFormat.Format24bppRgb);
         using (var g = Graphics.FromImage(work))
         {
             g.InterpolationMode = InterpolationMode.HighQualityBicubic;
             g.DrawImage(region,
                 new Rectangle(0, 0, work.Width, work.Height),
-                new Rectangle(left, 0, w, region.Height),
+                new Rectangle(left, 0, w, h),
                 GraphicsUnit.Pixel);
         }
 
@@ -88,6 +102,38 @@ public sealed class OcrReader : IDisposable
         using var ms = new MemoryStream();
         work.Save(ms, System.Drawing.Imaging.ImageFormat.Png);
         return ms.ToArray();
+    }
+
+    /// <summary>
+    /// The y of the last scanline (in region coordinates, within the x-crop) that carries text —
+    /// many strong horizontal luma gradients. Returns -1 if the region looks empty. Used to drop
+    /// the faint-scribble area below the rows, which otherwise derails recognition.
+    /// </summary>
+    private static int ContentBottom(Bitmap region, int left, int w)
+    {
+        var data = region.LockBits(new Rectangle(0, 0, region.Width, region.Height),
+            ImageLockMode.ReadOnly, PixelFormat.Format24bppRgb);
+        try
+        {
+            var row = new byte[data.Stride];
+            int lastActive = -1;
+            int xEnd = Math.Min(left + w, region.Width);
+            for (int y = 0; y < region.Height; y++)
+            {
+                Marshal.Copy(data.Scan0 + y * data.Stride, row, 0, data.Stride);
+                int edges = 0, prev = -1;
+                for (int x = left; x < xEnd; x++)
+                {
+                    int o = x * 3;
+                    int gray = (row[o] * 28 + row[o + 1] * 151 + row[o + 2] * 77) >> 8;
+                    if (prev >= 0 && Math.Abs(gray - prev) > EdgeGradient) edges++;
+                    prev = gray;
+                }
+                if (edges >= RowActivityMin) lastActive = y;
+            }
+            return lastActive;
+        }
+        finally { region.UnlockBits(data); }
     }
 
     private static int MeanLuminance(Bitmap bmp)
