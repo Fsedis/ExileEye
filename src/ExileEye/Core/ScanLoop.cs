@@ -209,24 +209,20 @@ public sealed class ScanLoop : IDisposable
         return rows;
     }
 
-    /// <summary>Results stay up until the panel closes, Esc/Ctrl+click, or the next F6.</summary>
+    /// <summary>
+    /// Results stay up until the user dismisses (a mouse click, Esc, or Ctrl+click — all routed
+    /// through the latch) or presses F6 again. Deliberately does NOT auto-hide on a "panel
+    /// closed" brightness reading: the gate false-positives on bright scenery (stone floors,
+    /// vistas), which would either keep the overlay stuck open or — worse — never let it close.
+    /// The click that closes the panel (item, close button, or the game world) dismisses anyway.
+    /// </summary>
     private async Task HoldAsync(CancellationToken ct)
     {
-        int dark = 0, frame = 0;
+        int frame = 0;
         while (!ct.IsCancellationRequested && !_scanRequested)
         {
             if (_dismissed) { _dismissed = false; Log("dismissed"); return; }
-            try
-            {
-                using var shot = ScreenGrabber.Capture(_settings.Region);
-                if (!PanelProbe.LooksOpen(shot, out _)) { if (++dark >= FramesToClose) { Log("panel closed"); return; } }
-                else dark = 0;
-                if (++frame % TopmostEveryFrames == 0) OverlayHost.ReassertTopmost();
-            }
-            catch (Exception ex)
-            {
-                Log($"ERROR {ex.GetType().Name}: {ex.Message}");
-            }
+            if (++frame % TopmostEveryFrames == 0) OverlayHost.ReassertTopmost();
             try { await Task.Delay(HoldPollMs, ct); } catch (OperationCanceledException) { return; }
         }
     }
