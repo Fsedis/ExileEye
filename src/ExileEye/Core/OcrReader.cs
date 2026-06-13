@@ -24,12 +24,16 @@ public sealed class OcrReader : IDisposable
     public const double RightCropFraction = 0.02;
 
     private const float MinLineConfidence = 10f;
-    private const int Upscale = 2;
+    private const int Upscale = 3;             // more pixels per glyph for the LSTM
     private const int SameRowTolerance = 25;   // px between merged reads of one row
 
     private readonly TesseractEngine _columnEngine;
     private readonly TesseractEngine _sparseEngine;
     private readonly Action<string>? _log;
+
+    /// <summary>When set, the exact binarized image handed to Tesseract is saved here each
+    /// Read — the single most useful artifact for diagnosing a bad recognition.</summary>
+    public string? DebugInputPath { get; set; }
 
     public OcrReader(string tessdataDir, string language, Action<string>? log = null)
     {
@@ -53,8 +57,14 @@ public sealed class OcrReader : IDisposable
         return MergePasses(colPass.Result, sparsePass.Result);
     }
 
-    /// <summary>Crop decorations → fix polarity → 2× bicubic upscale → PNG.</summary>
-    private static byte[] PrepareImage(Bitmap region)
+    /// <summary>
+    /// Crop decorations → grayscale → bicubic upscale → Otsu binarize to crisp black-on-white.
+    /// Binarization is the key step on the parchment "combinations" book: the textured background
+    /// and faint map scribbles throw off Tesseract's internal thresholding, so an explicit global
+    /// threshold that isolates the ink strokes is what makes those rows read reliably. Polarity is
+    /// handled for free — the majority class is the background, whichever way round it is.
+    /// </summary>
+    private byte[] PrepareImage(Bitmap region)
     {
         int left = Math.Max(1, (int)(region.Width * LeftCropFraction));
         int right = (int)(region.Width * RightCropFraction);
@@ -70,43 +80,18 @@ public sealed class OcrReader : IDisposable
                 GraphicsUnit.Pixel);
         }
 
-        // Tesseract reads dark-on-light best, and the game uses both polarities: the exchange
-        // panel is light text on a dark surface (invert it), the runeshaping-combinations book
-        // is dark text on light parchment (inverting THAT degraded marginal rows to misses —
-        // only rows brightened by mouse hover survived). Mean luminance picks the polarity.
-        if (MeanLuminance(work) < 128) InvertInPlace(work);
+        Binarize(work);
+
+        if (DebugInputPath is { } path)
+            try { work.Save(path, System.Drawing.Imaging.ImageFormat.Png); } catch { }
 
         using var ms = new MemoryStream();
         work.Save(ms, System.Drawing.Imaging.ImageFormat.Png);
         return ms.ToArray();
     }
 
-    private static int MeanLuminance(Bitmap bmp)
-    {
-        const int step = 8;   // sparse grid is plenty for a brightness average
-        var data = bmp.LockBits(new Rectangle(0, 0, bmp.Width, bmp.Height),
-            ImageLockMode.ReadOnly, PixelFormat.Format24bppRgb);
-        try
-        {
-            long sum = 0;
-            int samples = 0;
-            var row = new byte[data.Stride];
-            for (int y = 0; y < bmp.Height; y += step)
-            {
-                Marshal.Copy(data.Scan0 + y * data.Stride, row, 0, data.Stride);
-                for (int x = 0; x < bmp.Width; x += step)
-                {
-                    int o = x * 3;
-                    sum += (row[o] + row[o + 1] + row[o + 2]) / 3;
-                    samples++;
-                }
-            }
-            return samples > 0 ? (int)(sum / samples) : 0;
-        }
-        finally { bmp.UnlockBits(data); }
-    }
-
-    private static void InvertInPlace(Bitmap bmp)
+    /// <summary>In-place grayscale → Otsu threshold → black text on white background.</summary>
+    private static void Binarize(Bitmap bmp)
     {
         var data = bmp.LockBits(new Rectangle(0, 0, bmp.Width, bmp.Height),
             ImageLockMode.ReadWrite, PixelFormat.Format24bppRgb);
@@ -115,10 +100,69 @@ public sealed class OcrReader : IDisposable
             int len = data.Stride * bmp.Height;
             var buf = new byte[len];
             Marshal.Copy(data.Scan0, buf, 0, len);
-            for (int i = 0; i < len; i++) buf[i] = (byte)~buf[i];
+
+            // Grayscale (luma) + histogram in one pass; overwrite each pixel's blue channel with
+            // its gray value so the threshold pass needn't recompute it.
+            var hist = new int[256];
+            for (int y = 0; y < bmp.Height; y++)
+            {
+                int rowStart = y * data.Stride;
+                for (int x = 0; x < bmp.Width; x++)
+                {
+                    int o = rowStart + x * 3;
+                    int gray = (buf[o] * 28 + buf[o + 1] * 151 + buf[o + 2] * 77) >> 8; // BGR luma
+                    buf[o] = (byte)gray;
+                    hist[gray]++;
+                }
+            }
+
+            int threshold = OtsuThreshold(hist, bmp.Width * bmp.Height);
+
+            // The background is the majority class; make it white and the text black so Tesseract
+            // always sees dark-on-light regardless of the panel's native polarity.
+            long darkCount = 0;
+            for (int i = 0; i <= threshold; i++) darkCount += hist[i];
+            bool backgroundIsDark = darkCount > (long)bmp.Width * bmp.Height / 2;
+
+            for (int y = 0; y < bmp.Height; y++)
+            {
+                int rowStart = y * data.Stride;
+                for (int x = 0; x < bmp.Width; x++)
+                {
+                    int o = rowStart + x * 3;
+                    bool isText = backgroundIsDark ? buf[o] > threshold : buf[o] <= threshold;
+                    byte v = isText ? (byte)0 : (byte)255;
+                    buf[o] = buf[o + 1] = buf[o + 2] = v;
+                }
+            }
             Marshal.Copy(buf, 0, data.Scan0, len);
         }
         finally { bmp.UnlockBits(data); }
+    }
+
+    /// <summary>Otsu's method: the threshold maximizing between-class variance.</summary>
+    private static int OtsuThreshold(int[] hist, int total)
+    {
+        long sum = 0;
+        for (int i = 0; i < 256; i++) sum += (long)i * hist[i];
+
+        long sumB = 0;
+        int weightB = 0;
+        double maxVar = -1;
+        int threshold = 127;
+        for (int t = 0; t < 256; t++)
+        {
+            weightB += hist[t];
+            if (weightB == 0) continue;
+            int weightF = total - weightB;
+            if (weightF == 0) break;
+            sumB += (long)t * hist[t];
+            double meanB = (double)sumB / weightB;
+            double meanF = (double)(sum - sumB) / weightF;
+            double between = (double)weightB * weightF * (meanB - meanF) * (meanB - meanF);
+            if (between > maxVar) { maxVar = between; threshold = t; }
+        }
+        return threshold;
     }
 
     private List<OcrLine> RunPass(TesseractEngine engine, byte[] png, PageSegMode mode, int regionHeight)

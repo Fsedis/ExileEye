@@ -106,6 +106,10 @@ public sealed class ScanLoop : IDisposable
             $"prices={_prices.Count} region={_settings.Region}");
 
         using var ocr = new OcrReader(TessdataFetcher.TessdataDir, _settings.Language, Log);
+        // Save the exact image Tesseract sees on each scan, so a bad read can be diagnosed from
+        // the pixels rather than guessed at. Paired with the raw capture written in BurstAsync.
+        var debugDir = Path.Combine(AppContext.BaseDirectory, "debug");
+        try { Directory.CreateDirectory(debugDir); ocr.DebugInputPath = Path.Combine(debugDir, "ocr-input.png"); } catch { }
         var tracker = new RowTracker(Log);
         OverlayHost.Show(_settings.Region, _settings.OverlayGap);
         OverlayHost.SetIcons(_icons?.Divine, _icons?.Exalted);
@@ -180,6 +184,9 @@ public sealed class ScanLoop : IDisposable
                     Log($"no panel under the region (lum={lum})");
                     break;
                 }
+                if (f == 0)
+                    try { shot.Save(Path.Combine(AppContext.BaseDirectory, "debug", "capture.png"),
+                        System.Drawing.Imaging.ImageFormat.Png); } catch { }
                 var (next, anyPriced) = ScanFrame(ocr, tracker, shot);
                 if (anyPriced) confirmed = true;
                 if (next.Count > 0) rows = next;
