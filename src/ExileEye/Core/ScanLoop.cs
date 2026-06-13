@@ -28,6 +28,7 @@ public sealed class ScanLoop : IDisposable
     private readonly string _logPath = Path.Combine(AppContext.BaseDirectory, "scan.log");
     private CancellationTokenSource? _cts;
     private Task? _task;
+    private Rectangle _region;   // current panel region (screen coords); empty until located
 
     // The global Esc / click hook (App) hides the overlay through this latch; F6 raises the scan
     // request. Static because the hook outlives any single loop instance.
@@ -94,7 +95,12 @@ public sealed class ScanLoop : IDisposable
         var debugDir = Path.Combine(AppContext.BaseDirectory, "debug");
         try { Directory.CreateDirectory(debugDir); ocr.DebugInputPath = Path.Combine(debugDir, "ocr-input.png"); } catch { }
         var tracker = new RowTracker(Log);
-        OverlayHost.Show(_settings.Region, _settings.OverlayGap);
+        // The last-used panel region is a fast-path guess; revalidated on first scan and replaced
+        // by a fresh full-window locate whenever it stops yielding priced rows.
+        _region = _settings.Region;
+        // Only dock the overlay if we already have a region; otherwise the first locate docks it.
+        if (_region.Width > 0 && _region.Height > 0)
+            OverlayHost.Show(_region, _settings.OverlayGap);
         OverlayHost.SetIcons(_icons?.Divine, _icons?.Exalted);
         _dismissed = false;
         _scanRequested = false;
@@ -136,7 +142,7 @@ public sealed class ScanLoop : IDisposable
             tracker.Reset();
             Log("scan triggered");
 
-            var rows = await BurstAsync(ocr, tracker, ct);
+            var rows = await AcquireAsync(ocr, tracker, ct);
             if (rows.Count == 0) { _visible = false; OverlayHost.Clear(); continue; }
 
             await HoldAsync(ct);
@@ -145,10 +151,56 @@ public sealed class ScanLoop : IDisposable
         }
     }
 
-    /// <summary>A few OCR frames over the static panel; stops early when two consecutive frames
-    /// agree (jitter settled), or when nothing priced shows up.</summary>
-    private async Task<IReadOnlyList<DisplayRow>> BurstAsync(OcrReader ocr, RowTracker tracker, CancellationToken ct)
+    /// <summary>
+    /// Get priced rows for this F6 press. Tries the cached region first (fast); if it yields
+    /// nothing — first run, the panel moved, or a different panel is open — locates the panel
+    /// afresh from a full-window capture, re-docks the overlay, and scans the new region.
+    /// </summary>
+    private async Task<IReadOnlyList<DisplayRow>> AcquireAsync(OcrReader ocr, RowTracker tracker, CancellationToken ct)
     {
+        if (_region.Width > 0 && _region.Height > 0)
+        {
+            var rows = await BurstAsync(ocr, tracker, ct, _region);
+            if (rows.Count > 0) return rows;
+            Log("cached region yielded nothing — relocating");
+            tracker.Reset();
+        }
+
+        OverlayHost.Update([], showReadingHint: true);
+        var located = Locate(ocr);
+        if (located is null) { Log("no panel found on screen"); return []; }
+
+        _region = located.Value;
+        _settings.Region = _region;
+        _settings.Save();
+        OverlayHost.Show(_region, _settings.OverlayGap);   // re-dock the strip to the new region
+        Log($"located panel: {_region.Width}x{_region.Height} at {_region.X},{_region.Y}");
+
+        return await BurstAsync(ocr, tracker, ct, _region);
+    }
+
+    /// <summary>Full-window OCR → match against the book → bound the panel (screen coords).</summary>
+    private Rectangle? Locate(OcrReader ocr)
+    {
+        var window = GameWindow.Bounds();
+        using var shot = ScreenGrabber.Capture(window);
+        try { shot.Save(Path.Combine(AppContext.BaseDirectory, "debug", "window.png"),
+            System.Drawing.Imaging.ImageFormat.Png); } catch { }
+
+        var lines = ocr.ReadFull(shot);
+        var local = PanelLocator.Locate(lines, _prices.Prices);
+        if (local is not { } r) return null;
+        // PanelLocator works in capture coords; shift to screen coords by the window origin.
+        return new Rectangle(r.X + window.X, r.Y + window.Y, r.Width, r.Height);
+    }
+
+    /// <summary>A few OCR frames over the static panel; stops early when two consecutive frames
+    /// agree (jitter settled), or when nothing priced shows up. The region hugs the names, so
+    /// no left-crop (that would eat into them).</summary>
+    private async Task<IReadOnlyList<DisplayRow>> BurstAsync(
+        OcrReader ocr, RowTracker tracker, CancellationToken ct, Rectangle region)
+    {
+        ocr.LeftCrop = 0;   // auto-located region already starts at the names
         OverlayHost.Update([], showReadingHint: true);
         IReadOnlyList<DisplayRow> rows = [];
         bool confirmed = false;
@@ -159,12 +211,7 @@ public sealed class ScanLoop : IDisposable
         {
             try
             {
-                using var shot = ScreenGrabber.Capture(_settings.Region);
-                if (!PanelProbe.LooksOpen(shot, out int lum))
-                {
-                    Log($"no panel under the region (lum={lum})");
-                    break;
-                }
+                using var shot = ScreenGrabber.Capture(region);
                 if (f == 0)
                     try { shot.Save(Path.Combine(AppContext.BaseDirectory, "debug", "capture.png"),
                         System.Drawing.Imaging.ImageFormat.Png); } catch { }

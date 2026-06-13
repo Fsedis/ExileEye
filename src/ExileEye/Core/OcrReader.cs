@@ -23,9 +23,15 @@ public sealed record LocatedLine(string Name, int Quantity, string RawText, int 
 public sealed class OcrReader : IDisposable
 {
     // The panel draws 2–3 cost glyphs left of each name; cropping that column removes the
-    // worst OCR garbage. A sliver off the right edge drops border artifacts.
-    public const double LeftCropFraction = 0.30;
+    // worst OCR garbage. A sliver off the right edge drops border artifacts. LeftCrop is an
+    // instance setting: a manually-calibrated region spans the whole panel (crop the icons),
+    // but an auto-located region already hugs the names (crop nothing, or it eats the text).
+    public const double DefaultLeftCrop = 0.30;
     public const double RightCropFraction = 0.02;
+
+    /// <summary>Fraction of the region width trimmed from the left before OCR. Set 0 for
+    /// auto-located regions that already start at the names.</summary>
+    public double LeftCrop { get; set; } = DefaultLeftCrop;
 
     private const float MinLineConfidence = 10f;
     private const int Upscale = 2;
@@ -117,7 +123,7 @@ public sealed class OcrReader : IDisposable
     /// </summary>
     private byte[] PrepareImage(Bitmap region)
     {
-        int left = Math.Max(1, (int)(region.Width * LeftCropFraction));
+        int left = Math.Max(LeftCrop > 0 ? 1 : 0, (int)(region.Width * LeftCrop));
         int right = (int)(region.Width * RightCropFraction);
         int w = Math.Max(1, region.Width - left - right);
 

@@ -27,8 +27,6 @@ public partial class MainWindow : FluentWindow
     {
         _settings = Settings.Load();
 
-        RefreshRegionLabel();
-
         // Resolve the league list first (one quick call), then fetch prices exactly once for
         // the league that will actually be selected.
         var leagues = await LeagueDirectory.FetchAsync(_http);
@@ -87,10 +85,7 @@ public partial class MainWindow : FluentWindow
         }
 
         ShowReadyStatus();
-        StartStopButton.IsEnabled = _settings.IsCalibrated;
-        if (!_settings.IsCalibrated)
-            SetStatus(InfoBarSeverity.Warning, "Almost there",
-                "Open the game panel and click Calibrate to drag a box around it.");
+        StartStopButton.IsEnabled = true;
     }
 
     private void ShowReadyStatus()
@@ -98,7 +93,7 @@ public partial class MainWindow : FluentWindow
         if (_prices is null) return;
         string at = _prices.FetchedAt is { } t ? t.ToString("HH:mm") : "—";
         SetStatus(InfoBarSeverity.Success, "Ready",
-            $"{_prices.Count} items priced · updated {at} · F5 starts/stops · F6 scans · Esc hides");
+            $"{_prices.Count} items priced · updated {at} · Start, then F6 over a panel · Esc hides");
     }
 
     private void SetStatus(InfoBarSeverity severity, string title, string message)
@@ -106,26 +101,6 @@ public partial class MainWindow : FluentWindow
         StatusBar.Severity = severity;
         StatusBar.Title = title;
         StatusBar.Message = message;
-    }
-
-    private void RefreshRegionLabel() =>
-        RegionLabel.Text = _settings.IsCalibrated
-            ? $"{_settings.RegionWidth}×{_settings.RegionHeight} at {_settings.RegionX},{_settings.RegionY}"
-            : "not calibrated";
-
-    private void OnCalibrate(object sender, RoutedEventArgs e)
-    {
-        bool wasRunning = StopLoop();
-        var picked = RegionPicker.Pick();
-        if (picked is { } rect)
-        {
-            _settings.Region = rect;
-            _settings.Save();
-            RefreshRegionLabel();
-            StartStopButton.IsEnabled = _prices?.Count > 0;
-            ShowReadyStatus();
-        }
-        if (wasRunning) StartLoop();
     }
 
     private void OnStartStop(object sender, RoutedEventArgs e) => ToggleLoop();
@@ -139,7 +114,7 @@ public partial class MainWindow : FluentWindow
 
     private void StartLoop()
     {
-        if (_loop is not null || _prices is null || !_settings.IsCalibrated) return;
+        if (_loop is not null || _prices is null) return;
         if (!TessdataFetcher.HasLanguage(_settings.Language)) return;
         _loop = new ScanLoop(_settings, _prices, _icons);
         _loop.Start();

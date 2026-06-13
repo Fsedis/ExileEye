@@ -54,7 +54,9 @@ internal sealed class OverlayWindow : Form
     {
         _anchor = anchor;
         _gap = gap;
-        Bounds = new Rectangle(anchor.Right + gap, anchor.Y, LabelWidth, anchor.Height);
+        // Clamp to a sane minimum so an empty/zero region can't produce a 0-size canvas.
+        int h = Math.Max(40, anchor.Height);
+        Bounds = new Rectangle(anchor.Right + gap, anchor.Y, LabelWidth, h);
     }
 
     /// <summary>Currency sprites; either may be null → that currency falls back to text.</summary>
@@ -67,6 +69,7 @@ internal sealed class OverlayWindow : Form
     /// <summary>Repaint the strip. Empty rows + no hint → fully transparent (invisible).</summary>
     public void Render(IReadOnlyList<DisplayRow> rows, bool showReadingHint)
     {
+        if (Width <= 0 || Height <= 0) return;   // not docked to a real region yet
         using var canvas = new Bitmap(Width, Height, PixelFormat.Format32bppPArgb);
         using (var g = Graphics.FromImage(canvas))
         {

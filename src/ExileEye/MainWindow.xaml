@@ -51,21 +51,6 @@
                 </Grid>
             </ui:Card>
 
-            <ui:Card Margin="0,0,0,10" Padding="14">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="130"/>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Column="0" Text="Panel region" VerticalAlignment="Center" Opacity="0.8"/>
-                    <TextBlock Grid.Column="1" x:Name="RegionLabel" Text="not calibrated"
-                               VerticalAlignment="Center" FontFamily="Consolas" FontSize="12" Opacity="0.6"/>
-                    <ui:Button Grid.Column="2" x:Name="CalibrateButton" Content="Calibrate"
-                               Icon="{ui:SymbolIcon Crop24}" Click="OnCalibrate"/>
-                </Grid>
-            </ui:Card>
-
             <ui:Button x:Name="StartStopButton" Content="Start  (F5)" Appearance="Primary"
                        Icon="{ui:SymbolIcon Play24}" HorizontalAlignment="Stretch"
                        FontSize="15" Padding="0,10" IsEnabled="False"
