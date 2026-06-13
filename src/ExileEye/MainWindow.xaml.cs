@@ -169,12 +169,12 @@ public partial class MainWindow : FluentWindow
         }
         string? backup = SafeClipboardText();
         if (ItemParser.IsPoeItem(backup)) RestoreClipboard("");
-        InputSender.SendCtrlC();
+        uint injected = InputSender.SendCtrlC();
 
         string copied = "";
-        for (int i = 0; i < 10; i++)
+        for (int i = 0; i < 12; i++)
         {
-            await Task.Delay(55);
+            await Task.Delay(50);
             var now = SafeClipboardText() ?? "";
             if (ItemParser.IsPoeItem(now)) { copied = now; break; }
             if (now.Length > 0 && now != backup) copied = now;   // got *something*, even if unrecognized
@@ -182,9 +182,14 @@ public partial class MainWindow : FluentWindow
         DumpClipboardDebug(backup, copied);
         RestoreClipboard(backup);
 
-        if (copied.Length == 0)
-            SetStatus(InfoBarSeverity.Error, "Test copy: nothing copied",
-                "Ctrl+C didn't reach the game. Use borderless/windowed mode and run ExileEye as admin.");
+        // `injected` is how many key events the OS accepted: 0 ⇒ input was blocked (run as admin);
+        // 4 ⇒ the OS took it, so any failure is downstream (game focus / clipboard).
+        if (injected == 0)
+            SetStatus(InfoBarSeverity.Error, "Test copy: input blocked",
+                "Windows rejected the keystrokes (injected=0). Run ExileEye as administrator.");
+        else if (copied.Length == 0)
+            SetStatus(InfoBarSeverity.Error, $"Test copy: nothing copied (injected={injected})",
+                "Keys were sent but the clipboard stayed empty — was the game focused and an item under the cursor?");
         else
         {
             string first = copied.Split('\n')[0].Trim();
@@ -322,16 +327,11 @@ public partial class MainWindow : FluentWindow
         catch { /* best-effort diagnostic */ }
     }
 
-    private static string? SafeClipboardText()
-    {
-        try { return System.Windows.Clipboard.ContainsText() ? System.Windows.Clipboard.GetText() : null; }
-        catch { return null; }
-    }
+    private static string? SafeClipboardText() => ClipboardText.Read();
 
     private static void RestoreClipboard(string? text)
     {
-        try { if (!string.IsNullOrEmpty(text)) System.Windows.Clipboard.SetText(text); }
-        catch { /* clipboard busy — leave it */ }
+        if (text is not null) ClipboardText.Write(text);
     }
 
     private void OnClosing(object sender, System.ComponentModel.CancelEventArgs e)
