@@ -32,6 +32,14 @@ public partial class App : System.Windows.Application
             Environment.Exit(0);
             return;
         }
+        // Trade price-check check: search the live trade API for a type/name in the saved league.
+        //   ExileEye.exe --pricecheck "Divine Orb"
+        if (e.Args.Length >= 2 && e.Args[0] == "--pricecheck")
+        {
+            RunHeadlessPriceCheck(e.Args[1]);
+            Environment.Exit(0);
+            return;
+        }
 
         base.OnStartup(e);
 
@@ -84,6 +92,32 @@ public partial class App : System.Windows.Application
         {
             lines.Add($"[read] ERROR {ex}");
         }
+        try { File.WriteAllLines(outPath, lines); } catch { }
+    }
+
+    private static void RunHeadlessPriceCheck(string typeOrName)
+    {
+        var outPath = Path.Combine(AppContext.BaseDirectory, "price-check.txt");
+        var lines = new List<string>();
+        try
+        {
+            var settings = Settings.Load();
+            // Treat the arg as a currency/type search (the common case for a quick check).
+            var item = new ParsedItem(null, typeOrName, "Currency");
+            lines.Add($"[pricecheck] '{typeOrName}' league='{settings.League}'");
+            using var http = new System.Net.Http.HttpClient();
+            var client = new TradeClient(http);
+            var result = Task.Run(() => client.CheckAsync(item, settings.League)).GetAwaiter().GetResult();
+            if (result is null) { lines.Add("  no result (rate-limited or error)"); }
+            else
+            {
+                lines.Add($"  {result.Label}: {result.Total} online, {result.Listings.Count} fetched");
+                foreach (var l in result.Listings) lines.Add($"    {l.Amount} {l.Currency}");
+                var typ = result.Typical();
+                lines.Add($"  typical: {(typ is null ? "—" : $"{typ.Amount} {typ.Currency}")}");
+            }
+        }
+        catch (Exception ex) { lines.Add($"[pricecheck] ERROR {ex}"); }
         try { File.WriteAllLines(outPath, lines); } catch { }
     }
 
