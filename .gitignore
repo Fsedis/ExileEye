@@ -482,3 +482,10 @@ $RECYCLE.BIN/
 
 # Vim temporary swap files
 *.swp
+
+# ExileEye runtime/user data (never commit — settings.json holds POESESSID)
+settings.json
+**/debug/
+**/cache/
+**/tessdata/
+
