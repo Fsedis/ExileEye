@@ -86,10 +86,10 @@
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
-                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Trade search" VerticalAlignment="Center" Opacity="0.8"/>
-                    <CheckBox Grid.Row="0" Grid.Column="1" x:Name="BuyoutBox" Content="Instant buyout only"
-                              Click="OnTradeOptionChanged"
-                              ToolTip="Exclude listings with no set price (negotiable). On by default."/>
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Listings" VerticalAlignment="Center" Opacity="0.8"/>
+                    <ComboBox Grid.Row="0" Grid.Column="1" x:Name="StatusBox" Margin="0,2"
+                              SelectionChanged="OnTradeOptionChanged"
+                              ToolTip="Trade market: Instant buyout = securable (buy now), Online = personal trade (whisper the seller)."/>
 
                     <TextBlock Grid.Row="1" Grid.Column="0" Text="Listed within" VerticalAlignment="Center" Opacity="0.8"/>
                     <ComboBox Grid.Row="1" Grid.Column="1" x:Name="ListedBox" Margin="0,2"

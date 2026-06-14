@@ -12,12 +12,13 @@ public sealed record Listing(decimal Amount, string Currency);
 public sealed record TradeStat(string Id, double? Min = null);
 
 /// <summary>
-/// Where/how to search. Status: "online"/"any". BuyoutOnly: the default search already excludes
-/// unpriced listings (buyout/fixed price); set false to include "any" sale type. Listed: the
-/// "indexed" age filter ("", "1day", "3days", "1week") — fresher listings are the ones you can
-/// actually buy now.
+/// Where/how to search. Status is the trade market/availability (labels from EE2):
+///   "securable" = Instant buyout · "available" = Instant or Online · "online" = Online
+///   (personal trade) · "any" = incl. offline.
+/// Listed is the "indexed" age filter ("", "1day", "3days", "1week") — fresher listings are the
+/// ones you can actually buy now.
 /// </summary>
-public sealed record TradeOptions(string Status = "online", bool BuyoutOnly = true, string Listed = "");
+public sealed record TradeOptions(string Status = "available", string Listed = "");
 
 /// <summary>Price-check result: the searchable item, total listings online, and the cheapest few.</summary>
 public sealed record PriceCheck(string Label, int Total, IReadOnlyList<Listing> Listings, string? BrowseUrl = null)
@@ -95,9 +96,8 @@ public sealed class TradeClient
         if (!string.IsNullOrEmpty(item.Name)) q["name"] = item.Name;
         if (!string.IsNullOrEmpty(item.Type)) q["type"] = item.Type;
 
-        // trade_filters: sale type (default = buyout/fixed, i.e. omit the filter) and listing age.
+        // trade_filters: listing age. (Sale type defaults to buyout/fixed, so it's omitted.)
         var tf = new Dictionary<string, object>();
-        if (!opts.BuyoutOnly) tf["sale_type"] = new Dictionary<string, string> { ["option"] = "any" };
         if (!string.IsNullOrEmpty(opts.Listed)) tf["indexed"] = new Dictionary<string, string> { ["option"] = opts.Listed };
         if (tf.Count > 0)
             q["filters"] = new Dictionary<string, object> { ["trade_filters"] = new Dictionary<string, object> { ["filters"] = tf } };

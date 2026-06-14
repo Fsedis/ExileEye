@@ -132,7 +132,8 @@ public partial class MainWindow : FluentWindow
         LanguageBox.ItemsSource = Settings.Languages.Select(l => l.Label);
         LanguageBox.SelectedIndex = Math.Max(0,
             Array.FindIndex(Settings.Languages, l => l.Code == _settings.Language));
-        BuyoutBox.IsChecked = _settings.BuyoutOnly;
+        StatusBox.ItemsSource = Settings.StatusOptions.Select(o => o.Label);
+        StatusBox.SelectedIndex = Math.Max(0, Array.FindIndex(Settings.StatusOptions, o => o.Code == _settings.TradeStatus));
         ListedBox.ItemsSource = Settings.ListedOptions.Select(o => o.Label);
         ListedBox.SelectedIndex = Math.Max(0, Array.FindIndex(Settings.ListedOptions, o => o.Code == _settings.TradeListed));
         PopulateLeagues(leagues.Count > 0 ? leagues : Settings.Leagues);
@@ -296,7 +297,8 @@ public partial class MainWindow : FluentWindow
     private void OnTradeOptionChanged(object sender, RoutedEventArgs e)
     {
         if (_populating) return;
-        _settings.BuyoutOnly = BuyoutBox.IsChecked == true;
+        if (StatusBox.SelectedIndex >= 0)
+            _settings.TradeStatus = Settings.StatusOptions[StatusBox.SelectedIndex].Code;
         if (ListedBox.SelectedIndex >= 0)
             _settings.TradeListed = Settings.ListedOptions[ListedBox.SelectedIndex].Code;
         _settings.Save();
@@ -385,7 +387,7 @@ public partial class MainWindow : FluentWindow
                 }
             }
 
-            var tradeOpts = new TradeOptions(BuyoutOnly: _settings.BuyoutOnly, Listed: _settings.TradeListed);
+            var tradeOpts = new TradeOptions(_settings.TradeStatus, _settings.TradeListed);
 
             if (mods.Count > 0)
             {

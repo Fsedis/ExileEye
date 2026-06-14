@@ -29,10 +29,18 @@ public sealed class Settings
     public uint ScanHotkeyMods { get; set; } = 2;
     public uint ScanHotkeyVk { get; set; } = 0x53;
 
-    // Trade search options (see TradeOptions). BuyoutOnly default true = the API default (excludes
-    // unpriced). TradeListed limits listing age: "", "1day", "3days", "1week".
-    public bool BuyoutOnly { get; set; } = true;
+    // Trade search options (see TradeOptions). TradeStatus is the market: instant buyout vs
+    // personal trade. TradeListed limits listing age.
+    public string TradeStatus { get; set; } = "available";
     public string TradeListed { get; set; } = "";
+
+    public static readonly (string Code, string Label)[] StatusOptions =
+    [
+        ("securable", "Instant buyout"),
+        ("available", "Instant or online"),
+        ("online", "Online (personal)"),
+        ("any", "Any (incl. offline)"),
+    ];
 
     public static readonly (string Code, string Label)[] ListedOptions =
         [("", "Any time"), ("1day", "Last day"), ("3days", "Last 3 days"), ("1week", "Last week")];
