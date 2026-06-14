@@ -50,7 +50,8 @@
                             <TextBlock Grid.Column="1" Text="{Binding Text}" TextWrapping="Wrap"
                                        VerticalAlignment="Center" Opacity="0.9" FontSize="12"/>
                             <ui:TextBox Grid.Column="2" Text="{Binding MinText, Mode=TwoWay}"
-                                        Width="52" Margin="8,0,0,0" PlaceholderText="min" VerticalAlignment="Center"/>
+                                        Width="64" Margin="8,0,0,0" PlaceholderText="min" VerticalAlignment="Center"
+                                        ClearButtonEnabled="False" TextAlignment="Center"/>
                         </Grid>
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
