@@ -98,15 +98,6 @@
                 </Grid>
             </ui:Card>
 
-            <ui:Button x:Name="StartStopButton" Content="Start" Appearance="Primary"
-                       Icon="{ui:SymbolIcon Play24}" HorizontalAlignment="Stretch"
-                       FontSize="15" Padding="0,10" IsEnabled="False"
-                       Click="OnStartStop" Margin="0,4,0,8"/>
-
-            <ui:Button x:Name="TestCopyButton" Content="Test copy (diagnose Ctrl+C)"
-                       Icon="{ui:SymbolIcon ClipboardTask24}" HorizontalAlignment="Stretch"
-                       Padding="0,6" Click="OnTestCopy" Margin="0,0,0,12"/>
-
             <ui:InfoBar x:Name="StatusBar" IsOpen="True" IsClosable="False"
                         Severity="Informational" Title="Starting" Message="Loading prices from poe.ninja…"/>
 

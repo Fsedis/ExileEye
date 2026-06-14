@@ -156,7 +156,6 @@ public partial class MainWindow : FluentWindow
 
     private async Task ReloadPricesAsync()
     {
-        StartStopButton.IsEnabled = false;
         SetStatus(InfoBarSeverity.Informational, "Loading", "Fetching prices from poe.ninja…");
 
         _prices?.Dispose();
@@ -190,7 +189,6 @@ public partial class MainWindow : FluentWindow
         }
 
         ShowReadyStatus();
-        StartStopButton.IsEnabled = true;
     }
 
     private void ShowReadyStatus()
@@ -210,66 +208,11 @@ public partial class MainWindow : FluentWindow
         StatusBar.Message = message;
     }
 
-    private void OnStartStop(object sender, RoutedEventArgs e) => ToggleLoop();
-
-    /// <summary>Shared by the Start/Stop button (and could be a hotkey).</summary>
-    internal void ToggleLoop()
-    {
-        if (_loop is null) StartLoop();
-        else StopLoop();
-    }
-
     /// <summary>Ctrl+S: scan the panel, auto-starting the engine if it isn't running yet.</summary>
     internal void TriggerScan()
     {
         if (_loop is null) StartLoop();
         ScanLoop.RequestScan();
-    }
-
-    /// <summary>
-    /// Diagnostic: counts down so the user can focus the game and hover an item, sends Ctrl+C
-    /// directly (no hotkey involved), and reports exactly what landed on the clipboard — to tell
-    /// "synthetic input never reaches the game" apart from "the hotkey didn't fire".
-    /// </summary>
-    private async void OnTestCopy(object sender, RoutedEventArgs e)
-    {
-        for (int s = 5; s > 0; s--)
-        {
-            SetStatus(InfoBarSeverity.Informational, "Test copy",
-                $"Switch to the game and hover an item with the tooltip showing… {s}");
-            await Task.Delay(1000);
-        }
-        string? backup = SafeClipboardText();
-        if (ItemParser.IsPoeItem(backup)) RestoreClipboard("");
-        uint injected = InputSender.SendCtrlC();
-
-        string copied = "";
-        for (int i = 0; i < 12; i++)
-        {
-            await Task.Delay(50);
-            var now = SafeClipboardText() ?? "";
-            if (ItemParser.IsPoeItem(now)) { copied = now; break; }
-            if (now.Length > 0 && now != backup) copied = now;   // got *something*, even if unrecognized
-        }
-        DumpClipboardDebug(backup, copied, injected);
-        RestoreClipboard(backup);
-
-        // `injected` is how many key events the OS accepted: 0 ⇒ input was blocked (run as admin);
-        // 4 ⇒ the OS took it, so any failure is downstream (game focus / clipboard).
-        if (injected == 0)
-            SetStatus(InfoBarSeverity.Error, "Test copy: input blocked",
-                "Windows rejected the keystrokes (injected=0). Run ExileEye as administrator.");
-        else if (copied.Length == 0)
-            SetStatus(InfoBarSeverity.Error, $"Test copy: nothing copied (injected={injected})",
-                "Keys were sent but the clipboard stayed empty — was the game focused and an item under the cursor?");
-        else
-        {
-            string first = copied.Split('\n')[0].Trim();
-            bool ok = ItemParser.IsPoeItem(copied);
-            SetStatus(ok ? InfoBarSeverity.Success : InfoBarSeverity.Warning,
-                $"Test copy: {copied.Length} chars{(ok ? " (item recognized)" : " (not recognized)")}",
-                $"first line: {first}");
-        }
     }
 
     private void StartLoop()
@@ -278,9 +221,6 @@ public partial class MainWindow : FluentWindow
         if (!TessdataFetcher.HasLanguage(_settings.Language)) return;
         _loop = new ScanLoop(_settings, _prices, _icons);
         _loop.Start();
-        StartStopButton.Content = "Stop";
-        StartStopButton.Icon = new SymbolIcon(SymbolRegular.Stop24);
-        StartStopButton.Appearance = ControlAppearance.Danger;
     }
 
     private bool StopLoop()
@@ -288,9 +228,6 @@ public partial class MainWindow : FluentWindow
         if (_loop is null) return false;
         _loop.Dispose();
         _loop = null;
-        StartStopButton.Content = "Start";
-        StartStopButton.Icon = new SymbolIcon(SymbolRegular.Play24);
-        StartStopButton.Appearance = ControlAppearance.Primary;
         return true;
     }
 
