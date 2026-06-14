@@ -245,11 +245,28 @@ public partial class MainWindow : FluentWindow
     private void OnSessionChanged(object sender, RoutedEventArgs e)
     {
         if (_populating) return;
-        var v = SessionBox.Text.Trim();
-        if (v == _settings.PoeSessId) return;
-        _settings.PoeSessId = v;
+        ApplySession(SessionBox.Text.Trim());
+    }
+
+    private void OnLogin(object sender, RoutedEventArgs e)
+    {
+        var login = new LoginWindow { Owner = this };
+        if (login.ShowDialog() == true && login.SessionId is { Length: > 0 } sid)
+        {
+            _populating = true;
+            SessionBox.Text = sid;
+            _populating = false;
+            ApplySession(sid);
+            SetStatus(InfoBarSeverity.Success, "Logged in", "Session captured — instant buyout is available.");
+        }
+    }
+
+    private void ApplySession(string sid)
+    {
+        if (sid == _settings.PoeSessId) return;
+        _settings.PoeSessId = sid;
         _settings.Save();
-        if (_trade is not null) _trade.SessionId = v;
+        if (_trade is not null) _trade.SessionId = sid;
     }
 
     private async void OnLanguageChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)

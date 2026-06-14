@@ -1,0 +1,23 @@
+<ui:FluentWindow x:Class="ExileEye.LoginWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+        xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
+        Title="Log in to pathofexile.com"
+        Width="560" Height="720"
+        WindowStartupLocation="CenterScreen"
+        ExtendsContentIntoTitleBar="True"
+        WindowCornerPreference="Round">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+        <ui:TitleBar Grid.Row="0" Title="Log in to pathofexile.com" Icon="{x:Null}"/>
+        <ui:InfoBar Grid.Row="1" x:Name="Hint" IsOpen="True" IsClosable="False" Severity="Informational"
+                    Title="Log in" Message="Sign in to your GGG account — ExileEye captures the session and closes."
+                    Margin="8,0,8,6"/>
+        <wv2:WebView2 Grid.Row="2" x:Name="Web"/>
+    </Grid>
+</ui:FluentWindow>
