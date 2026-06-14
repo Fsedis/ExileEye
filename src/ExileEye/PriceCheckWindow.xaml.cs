@@ -25,12 +25,17 @@ public partial class PriceCheckWindow : FluentWindow
         public string MinText { get; set; } = "";
     }
 
+    private const int FirstPage = 20, NextPage = 10;
+
     private readonly ParsedItem _item;
     private readonly TradeClient _trade;
     private readonly Settings _settings;
     private readonly ObservableCollection<ModFilter> _mods;
+    private TradeSession? _session;
+    private readonly ObservableCollection<object> _listingRows = [];
     private string? _browseUrl;
     private bool _searching;
+    private bool _loadingMore;
     private bool _populating = true;
 
     public PriceCheckWindow(ParsedItem item, IReadOnlyList<ModFilter> mods, TradeClient trade, Settings settings)
@@ -44,6 +49,7 @@ public partial class PriceCheckWindow : FluentWindow
         ItemLabel.Text = item.Name is not null && item.Type is not null
             ? $"{item.Name} · {item.Type}" : item.Name ?? item.Type ?? "?";
         ModList.ItemsSource = _mods;
+        ListingList.ItemsSource = _listingRows;
 
         StatusBox.ItemsSource = Settings.StatusOptions.Select(o => o.Label);
         StatusBox.SelectedIndex = IndexOf(Settings.StatusOptions, _settings.TradeStatus);
@@ -94,28 +100,54 @@ public partial class PriceCheckWindow : FluentWindow
                 double.TryParse(m.MinText, NumberStyles.Any, CultureInfo.InvariantCulture, out var v) ? v : null)).ToList();
             var opts = new TradeOptions(_settings.TradeStatus, _settings.TradeListed, _settings.TradeCurrency);
             EstimateText.Text = "Searching…"; RangeText.Text = ""; StatusLine.Text = "";
+            _modCount = stats.Count;
 
-            var result = await _trade.CheckAsync(_item, _settings.League, _settings.Language,
+            _listingRows.Clear();
+            _session = await _trade.SearchAsync(_item, _settings.League, _settings.Language,
                 stats.Count > 0 ? stats : null, opts);
-            if (result is null) { EstimateText.Text = "No data (rate-limited or offline)"; ListingList.ItemsSource = null; return; }
+            if (_session is null) { EstimateText.Text = "No data (rate-limited or offline)"; return; }
 
-            _browseUrl = result.BrowseUrl;
+            _browseUrl = _session.BrowseUrl;
             BrowserButton.IsEnabled = _browseUrl is not null;
+            await _session.FetchMoreAsync(FirstPage);
+            Render();
+        }
+        finally { _searching = false; SearchButton.IsEnabled = true; }
+    }
 
-            var est = result.Estimated();
-            EstimateText.Text = est is null ? "no price" : $"≈ {Format(est.Mid)} {ShortCurrency(est.Currency)}";
-            RangeText.Text = est is null ? "" : $"range {Format(est.Low)}–{Format(est.High)} · reliability {est.Reliability}";
-            StatusLine.Text = $"{result.Total} online · {(stats.Count > 0 ? $"{stats.Count} mods" : "base type")}";
-            ListingList.ItemsSource = result.Listings.Select(l => new
+    private int _modCount;
+
+    // Appends only the not-yet-shown listings, so loading more keeps the scroll position.
+    private void Render()
+    {
+        if (_session is null) return;
+        var est = _session.Estimated();
+        EstimateText.Text = est is null ? "no price" : $"≈ {Format(est.Mid)} {ShortCurrency(est.Currency)}";
+        RangeText.Text = est is null ? "" : $"range {Format(est.Low)}–{Format(est.High)} · reliability {est.Reliability}";
+        StatusLine.Text = $"{_session.Total} online · {(_modCount > 0 ? $"{_modCount} mods" : "base type")}"
+            + (_session.HasMore ? " · scroll for more" : "");
+        for (int i = _listingRows.Count; i < _session.Listings.Count; i++)
+        {
+            var l = _session.Listings[i];
+            _listingRows.Add(new
             {
                 Price = $"{Format(l.Amount)} {ShortCurrency(l.Currency)}",
                 Level = l.ReqLevel is { } lv ? $"L{lv}" : "",
                 Quality = l.Quality is { } q ? $"{q}%" : "",
                 Account = l.Account,
                 Age = RelativeAge(l.Listed),
-            }).ToList();
+            });
         }
-        finally { _searching = false; SearchButton.IsEnabled = true; }
+    }
+
+    // Near the bottom and more to load → fetch the next page and append.
+    private async void OnListingScroll(object sender, System.Windows.Controls.ScrollChangedEventArgs e)
+    {
+        if (_loadingMore || _session is null || !_session.HasMore) return;
+        if (e.VerticalOffset < e.ExtentHeight - e.ViewportHeight - 40) return;   // not near the bottom yet
+        _loadingMore = true;
+        try { if (await _session.FetchMoreAsync(NextPage) > 0) Render(); }
+        finally { _loadingMore = false; }
     }
 
     private void OnOpenBrowser(object sender, RoutedEventArgs e)

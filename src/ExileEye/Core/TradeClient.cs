@@ -30,14 +30,16 @@ public sealed record PriceCheck(string Label, int Total, IReadOnlyList<Listing> 
     /// <summary>The cheapest listing (results come sorted by price ascending).</summary>
     public Listing? Cheapest => Listings.Count > 0 ? Listings[0] : null;
 
+    public Estimate? Estimated() => EstimateOf(Listings);
+
     /// <summary>
     /// A rough value from the most-listed currency: the median as the estimate, low/high as the
     /// fetched range. Reliability drops with few listings or a wide spread (the price is uncertain).
     /// </summary>
-    public Estimate? Estimated()
+    public static Estimate? EstimateOf(IReadOnlyList<Listing> listings)
     {
-        if (Listings.Count == 0) return null;
-        var group = Listings.GroupBy(l => l.Currency).OrderByDescending(g => g.Count()).First();
+        if (listings.Count == 0) return null;
+        var group = listings.GroupBy(l => l.Currency).OrderByDescending(g => g.Count()).First();
         var amounts = group.Select(l => l.Amount).OrderBy(a => a).ToList();
         decimal low = amounts[0], high = amounts[^1], mid = amounts[amounts.Count / 2];
         double spread = (double)(high / Math.Max(low, 0.01m));
@@ -45,6 +47,53 @@ public sealed record PriceCheck(string Label, int Total, IReadOnlyList<Listing> 
             : amounts.Count < 8 || spread > 2 ? "medium" : "high";
         return new Estimate(mid, low, high, group.Key, reliability, amounts.Count);
     }
+}
+
+/// <summary>
+/// A running price-check search: holds the result hash list and a cursor so listings page in as
+/// the user scrolls, without re-running the search.
+/// </summary>
+public sealed class TradeSession
+{
+    private readonly TradeClient _client;
+    private readonly string _baseUrl, _searchId;
+    private readonly List<string> _ids;
+    private int _cursor;
+    private bool _loading;
+
+    public int Total { get; }
+    public string BrowseUrl { get; }
+    public List<Listing> Listings { get; } = [];
+    public bool HasMore => _cursor < _ids.Count;
+
+    internal TradeSession(TradeClient client, string baseUrl, string searchId, List<string> ids, int total, string browse)
+    {
+        _client = client; _baseUrl = baseUrl; _searchId = searchId; _ids = ids; Total = total; BrowseUrl = browse;
+    }
+
+    /// <summary>Fetch roughly the next <paramref name="count"/> listings; returns how many were added.</summary>
+    public async Task<int> FetchMoreAsync(int count)
+    {
+        if (_loading) return 0;
+        _loading = true;
+        try
+        {
+            int added = 0;
+            while (added < count && HasMore)
+            {
+                var batch = _ids.Skip(_cursor).Take(TradeClient.Chunk).ToList();
+                _cursor += batch.Count;
+                var ls = await _client.FetchBatchAsync(_baseUrl, _searchId, batch);
+                Listings.AddRange(ls);
+                added += ls.Count;
+                if (ls.Count == 0) break;
+            }
+            return added;
+        }
+        finally { _loading = false; }
+    }
+
+    public Estimate? Estimated() => PriceCheck.EstimateOf(Listings);
 }
 
 /// <summary>
@@ -73,41 +122,52 @@ public sealed class TradeClient
     private static string BaseFor(string language) =>
         (language == "ru" ? "https://ru.pathofexile.com" : "https://www.pathofexile.com") + "/api/trade2";
 
+    /// <summary>One-shot price check (toast/headless): search + fetch the first page of listings.</summary>
     public async Task<PriceCheck?> CheckAsync(ParsedItem item, string league, string language = "en",
+        IReadOnlyList<TradeStat>? stats = null, TradeOptions? options = null)
+    {
+        var session = await SearchAsync(item, league, language, stats, options);
+        if (session is null) return null;
+        await session.FetchMoreAsync(FetchTarget);
+        return new PriceCheck(item.Name ?? item.Type ?? "?", session.Total, session.Listings, session.BrowseUrl);
+    }
+
+    /// <summary>
+    /// Run the search and return a session that fetches listings on demand — the window fetches
+    /// the first page, then more as you scroll. The result hash list (up to ~100) is kept so paging
+    /// needs no re-search.
+    /// </summary>
+    public async Task<TradeSession?> SearchAsync(ParsedItem item, string league, string language = "en",
         IReadOnlyList<TradeStat>? stats = null, TradeOptions? options = null)
     {
         if (!item.IsSearchable) return null;
         var baseUrl = BaseFor(language);
-        var label = item.Name ?? item.Type ?? "?";
 
         var query = BuildQuery(item, stats, options ?? new TradeOptions());
-        var searchUrl = $"{baseUrl}/search/{Uri.EscapeDataString(league)}";
-        var search = await PostJsonAsync(searchUrl, query);
+        var search = await PostJsonAsync($"{baseUrl}/search/{Uri.EscapeDataString(league)}", query);
         if (search is null) return null;
 
         using var doc = JsonDocument.Parse(search);
         var root = doc.RootElement;
         if (!root.TryGetProperty("id", out var idEl) || idEl.GetString() is not { } searchId) return null;
         int total = root.TryGetProperty("total", out var t) ? t.GetInt32() : 0;
-        // Browseable trade page for "open in browser".
-        var browse = $"{BaseFor(language).Replace("/api/trade2", "/trade2")}/search/{Uri.EscapeDataString(league)}/{searchId}";
-        if (!root.TryGetProperty("result", out var resultArr) || resultArr.GetArrayLength() == 0)
-            return new PriceCheck(label, total, [], browse);
+        var browse = $"{baseUrl.Replace("/api/trade2", "/trade2")}/search/{Uri.EscapeDataString(league)}/{searchId}";
 
-        var ids = resultArr.EnumerateArray().Take(FetchTarget).Select(e => e.GetString())
-            .Where(s => s is not null).Select(s => s!).ToList();
-
-        // Fetch in chunks of 10 (the endpoint's max) and combine, so the result list is long
-        // enough to scroll through.
-        var listings = new List<Listing>();
-        for (int i = 0; i < ids.Count; i += FetchChunk)
-        {
-            var batch = string.Join(',', ids.Skip(i).Take(FetchChunk));
-            var fetched = await GetAsync($"{baseUrl}/fetch/{batch}?query={searchId}");
-            if (fetched is not null) listings.AddRange(ParseListings(fetched));
-        }
-        return new PriceCheck(label, total, listings, browse);
+        var ids = root.TryGetProperty("result", out var arr)
+            ? arr.EnumerateArray().Select(e => e.GetString()).Where(s => s is not null).Select(s => s!).ToList()
+            : [];
+        return new TradeSession(this, baseUrl, searchId, ids, total, browse);
     }
+
+    internal async Task<IReadOnlyList<Listing>> FetchBatchAsync(string baseUrl, string searchId, IEnumerable<string> ids)
+    {
+        var batch = string.Join(',', ids);
+        if (batch.Length == 0) return [];
+        var json = await GetAsync($"{baseUrl}/fetch/{batch}?query={searchId}");
+        return json is null ? [] : ParseListings(json);
+    }
+
+    internal const int Chunk = FetchChunk;
 
     // {"query":{"status":{"option":"online"}, name?/type?, stats?}, "sort":{"price":"asc"}}
     // Each stat filter carries its id and an optional min value (the user picks which mods and
