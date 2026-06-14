@@ -27,6 +27,7 @@ public partial class MainWindow : FluentWindow
     private ScanLoop? _loop;
     private TradeClient? _trade;
     private StatDb? _stats;
+    private CurrencyIcons? _currencyIcons;
     private bool _populating;
     private bool _priceCheckBusy;
     private TrayIcon? _tray;
@@ -195,6 +196,10 @@ public partial class MainWindow : FluentWindow
         _stats = new StatDb();
         await _stats.LoadAsync(_http, _settings.Language);
 
+        // Currency icons for the listing rows (downloaded once, cached on disk).
+        _currencyIcons = new CurrencyIcons();
+        await _currencyIcons.LoadAsync(_http);
+
         if (!ocrModel.Result)
         {
             SetStatus(InfoBarSeverity.Error, Loc.T("ocr_missing"), Loc.T("ocr_missing_msg"));
@@ -244,7 +249,6 @@ public partial class MainWindow : FluentWindow
         AccountLabel.Text = Loc.T("account");
         SessionBox.PlaceholderText = Loc.T("session_placeholder");
         SessionBox.ToolTip = Loc.T("session_tip");
-        LoginButton.Content = Loc.T("login");
     }
 
     /// <summary>Ctrl+S: scan the panel, auto-starting the engine if it isn't running yet.</summary>
@@ -284,19 +288,6 @@ public partial class MainWindow : FluentWindow
     {
         if (_populating) return;
         ApplySession(SessionBox.Text.Trim());
-    }
-
-    private void OnLogin(object sender, RoutedEventArgs e)
-    {
-        var login = new LoginWindow { Owner = this };
-        if (login.ShowDialog() == true && login.SessionId is { Length: > 0 } sid)
-        {
-            _populating = true;
-            SessionBox.Text = sid;
-            _populating = false;
-            ApplySession(sid);
-            SetStatus(InfoBarSeverity.Success, Loc.T("logged_in"), Loc.T("logged_in_msg"));
-        }
     }
 
     private void ApplySession(string sid)
@@ -397,7 +388,7 @@ public partial class MainWindow : FluentWindow
 
             if (mods.Count > 0)
             {
-                var win = new PriceCheckWindow(item, mods, _trade, _settings);
+                var win = new PriceCheckWindow(item, mods, _trade, _settings, _currencyIcons);
                 win.Show();
                 win.PositionAt(System.Windows.Forms.Cursor.Position);
                 return;

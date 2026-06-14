@@ -28,10 +28,9 @@ public static class Loc
         ["listed_tip"] = ("Only listings posted within this window — fresher ones are likelier buyable now.",
             "Только листинги не старше выбранного — свежие вероятнее купить сейчас."),
         ["account"] = ("Account", "Аккаунт"),
-        ["session_placeholder"] = ("POESESSID (or click Log in)", "POESESSID (или нажми «Войти»)"),
-        ["session_tip"] = ("Session cookie for the instant-buyout market. Click Log in to capture it. Stored locally.",
-            "Куки сессии для мгновенного выкупа. Нажми «Войти», чтобы получить. Хранится локально."),
-        ["login"] = ("Log in", "Войти"),
+        ["session_placeholder"] = ("POESESSID (optional, for instant buyout)", "POESESSID (опц., для мгновенного выкупа)"),
+        ["session_tip"] = ("Session cookie for the instant-buyout market — paste it from pathofexile.com cookies. Stored locally.",
+            "Куки сессии для мгновенного выкупа — вставь из cookies pathofexile.com. Хранится локально."),
 
         ["loading"] = ("Loading", "Загрузка"),
         ["fetching_prices"] = ("Fetching prices from poe.ninja…", "Загружаю цены с poe.ninja…"),

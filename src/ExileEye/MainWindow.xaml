@@ -98,18 +98,10 @@
                               ToolTip="Only listings posted within this window — fresher listings are more likely buyable now."/>
 
                     <TextBlock x:Name="AccountLabel" Grid.Row="2" Grid.Column="0" Text="Account" VerticalAlignment="Center" Opacity="0.8"/>
-                    <Grid Grid.Row="2" Grid.Column="1" Margin="0,2">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-                        <ui:TextBox Grid.Column="0" x:Name="SessionBox"
-                                    PlaceholderText="POESESSID (or click Log in)"
-                                    LostFocus="OnSessionChanged"
-                                    ToolTip="Session cookie for the instant-buyout market. Click Log in to capture it automatically, or paste it manually. Stored locally."/>
-                        <ui:Button Grid.Column="1" x:Name="LoginButton" Content="Log in" Margin="6,0,0,0"
-                                   Icon="{ui:SymbolIcon Person24}" Click="OnLogin"/>
-                    </Grid>
+                    <ui:TextBox Grid.Row="2" Grid.Column="1" x:Name="SessionBox" Margin="0,2"
+                                PlaceholderText="POESESSID (optional, for instant buyout)"
+                                LostFocus="OnSessionChanged"
+                                ToolTip="Session cookie for the instant-buyout market. Paste it from pathofexile.com browser cookies. Stored locally."/>
                 </Grid>
             </ui:Card>
 

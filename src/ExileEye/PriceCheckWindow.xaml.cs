@@ -31,6 +31,8 @@ public partial class PriceCheckWindow : FluentWindow
     private readonly ParsedItem _item;
     private readonly TradeClient _trade;
     private readonly Settings _settings;
+    private readonly CurrencyIcons? _currencyIcons;
+    private readonly Dictionary<string, System.Windows.Media.ImageSource> _iconCache = new();
     private readonly ObservableCollection<ModFilter> _mods;
     private TradeSession? _session;
     private readonly ObservableCollection<object> _listingRows = [];
@@ -39,12 +41,14 @@ public partial class PriceCheckWindow : FluentWindow
     private bool _loadingMore;
     private bool _populating = true;
 
-    public PriceCheckWindow(ParsedItem item, IReadOnlyList<ModFilter> mods, TradeClient trade, Settings settings)
+    public PriceCheckWindow(ParsedItem item, IReadOnlyList<ModFilter> mods, TradeClient trade,
+        Settings settings, CurrencyIcons? currencyIcons = null)
     {
         InitializeComponent();
         _item = item;
         _trade = trade;
         _settings = settings;
+        _currencyIcons = currencyIcons;
         _mods = new ObservableCollection<ModFilter>(mods);
 
         ItemLabel.Text = item.Name is not null && item.Type is not null
@@ -140,9 +144,12 @@ public partial class PriceCheckWindow : FluentWindow
         for (int i = _listingRows.Count; i < _session.Listings.Count; i++)
         {
             var l = _session.Listings[i];
+            var icon = GetIcon(l.Currency);
             _listingRows.Add(new
             {
-                Price = $"{Format(l.Amount)} {ShortCurrency(l.Currency)}",
+                Amount = Format(l.Amount),
+                Icon = icon,
+                Cur = icon is null ? ShortCurrency(l.Currency) : "",
                 Level = l.ReqLevel is { } lv ? $"L{lv}" : "",
                 Quality = l.Quality is { } q ? $"{q}%" : "",
                 Account = l.Account,
@@ -167,6 +174,25 @@ public partial class PriceCheckWindow : FluentWindow
     {
         if (_browseUrl is null) return;
         try { Process.Start(new ProcessStartInfo(_browseUrl) { UseShellExecute = true }); } catch { }
+    }
+
+    private System.Windows.Media.ImageSource? GetIcon(string code)
+    {
+        if (_iconCache.TryGetValue(code, out var cached)) return cached;
+        var path = _currencyIcons?.PathFor(code);
+        if (path is null || !System.IO.File.Exists(path)) return null;
+        try
+        {
+            var bmp = new System.Windows.Media.Imaging.BitmapImage();
+            bmp.BeginInit();
+            bmp.UriSource = new System.Uri(path);
+            bmp.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
+            bmp.EndInit();
+            bmp.Freeze();
+            _iconCache[code] = bmp;
+            return bmp;
+        }
+        catch { return null; }
     }
 
     private static double? ParseNum(string s) =>

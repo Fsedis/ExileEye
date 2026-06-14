@@ -82,7 +82,7 @@
                         <Grid Margin="8,2">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="92"/>
+                                <ColumnDefinition Width="106"/>
                                 <ColumnDefinition Width="40"/>
                                 <ColumnDefinition Width="40"/>
                                 <ColumnDefinition Width="*"/>
@@ -97,7 +97,11 @@
                                     </ToolTip>
                                 </ui:SymbolIcon.ToolTip>
                             </ui:SymbolIcon>
-                            <TextBlock Grid.Column="1" Text="{Binding Price}" FontWeight="SemiBold" FontSize="13" VerticalAlignment="Center"/>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Text="{Binding Amount}" FontWeight="SemiBold" FontSize="13" VerticalAlignment="Center"/>
+                                <Image Source="{Binding Icon}" Width="18" Height="18" Margin="3,0,0,0" VerticalAlignment="Center"/>
+                                <TextBlock Text="{Binding Cur}" Margin="3,0,0,0" Opacity="0.6" FontSize="12" VerticalAlignment="Center"/>
+                            </StackPanel>
                             <TextBlock Grid.Column="2" Text="{Binding Level}" Opacity="0.5" FontSize="12" VerticalAlignment="Center"/>
                             <TextBlock Grid.Column="3" Text="{Binding Quality}" Opacity="0.5" FontSize="12" VerticalAlignment="Center"/>
                             <TextBlock Grid.Column="4" Text="{Binding Account}" Opacity="0.55" TextTrimming="CharacterEllipsis" FontSize="12" VerticalAlignment="Center"/>
