@@ -39,6 +39,7 @@ public sealed class TradeClient
     private const int FetchBatch = 10;   // the cheapest N listings is plenty for a price read
 
     private readonly HttpClient _http;
+    private readonly RateLimiter _limiter = new();
     public TradeClient(HttpClient http) => _http = http;
 
     /// <summary>Trade host for the client language — item names are copied localized.</summary>
@@ -152,13 +153,22 @@ public sealed class TradeClient
         req.Headers.TryAddWithoutValidation("Accept", "application/json");
         try
         {
+            await _limiter.AcquireAsync();   // proactively stay under the per-IP window
             var resp = await _http.SendAsync(req);
+            _limiter.Configure(Header(resp, "X-Rate-Limit-Ip"));
+
             if (resp.StatusCode == HttpStatusCode.TooManyRequests)
             {
-                Console.Error.WriteLine("[Trade] rate-limited (429) — try again in a moment");
-                return null;
+                // Honour the server's retry window, then give it one more go.
+                int retryAfter = int.TryParse(Header(resp, "Retry-After"), out var s) ? s : 10;
+                Console.Error.WriteLine($"[Trade] rate-limited (429) — waiting {retryAfter}s");
+                await Task.Delay(TimeSpan.FromSeconds(Math.Clamp(retryAfter, 1, 60)));
+                await _limiter.AcquireAsync();
+                resp = await _http.SendAsync(await CloneAsync(req));
+                _limiter.Configure(Header(resp, "X-Rate-Limit-Ip"));
+                if (!resp.IsSuccessStatusCode) return null;
             }
-            if (!resp.IsSuccessStatusCode)
+            else if (!resp.IsSuccessStatusCode)
             {
                 Console.Error.WriteLine($"[Trade] HTTP {(int)resp.StatusCode} for {req.RequestUri?.AbsolutePath}");
                 return null;
@@ -170,5 +180,21 @@ public sealed class TradeClient
             Console.Error.WriteLine($"[Trade] request failed: {ex.Message}");
             return null;
         }
+    }
+
+    private static string? Header(HttpResponseMessage resp, string name) =>
+        resp.Headers.TryGetValues(name, out var v) ? v.FirstOrDefault() : null;
+
+    // A sent HttpRequestMessage can't be reused, so rebuild it for the one retry.
+    private static async Task<HttpRequestMessage> CloneAsync(HttpRequestMessage req)
+    {
+        var clone = new HttpRequestMessage(req.Method, req.RequestUri);
+        foreach (var h in req.Headers) clone.Headers.TryAddWithoutValidation(h.Key, h.Value);
+        if (req.Content is not null)
+        {
+            var body = await req.Content.ReadAsStringAsync();
+            clone.Content = new StringContent(body, Encoding.UTF8, "application/json");
+        }
+        return clone;
     }
 }
