@@ -30,20 +30,8 @@
             <TextBlock x:Name="RangeText" FontSize="12" Opacity="0.6"/>
         </StackPanel>
 
-        <!-- Inline search controls -->
-        <Grid Grid.Row="2" Margin="14,4,14,4">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
-            <ComboBox Grid.Column="0" x:Name="StatusBox" Margin="2,0" SelectionChanged="OnControlChanged" ToolTip="Market"/>
-            <ComboBox Grid.Column="1" x:Name="ListedBox" Margin="2,0" SelectionChanged="OnControlChanged" ToolTip="Listed within"/>
-            <ComboBox Grid.Column="2" x:Name="CurrencyBox" Margin="2,0" SelectionChanged="OnControlChanged" ToolTip="Valuation currency"/>
-        </Grid>
-
         <!-- Mods -->
-        <ScrollViewer Grid.Row="3" MaxHeight="220" Margin="8,2,8,0" VerticalScrollBarVisibility="Auto">
+        <ScrollViewer Grid.Row="2" MaxHeight="220" Margin="8,2,8,0" VerticalScrollBarVisibility="Auto">
             <ItemsControl x:Name="ModList">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
@@ -64,6 +52,18 @@
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
         </ScrollViewer>
+
+        <!-- Inline search controls, right above the results (like the reference tools) -->
+        <Grid Grid.Row="3" Margin="14,6,14,4">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <ComboBox Grid.Column="0" x:Name="StatusBox" Margin="2,0" SelectionChanged="OnControlChanged" ToolTip="Market"/>
+            <ComboBox Grid.Column="1" x:Name="ListedBox" Margin="2,0" SelectionChanged="OnControlChanged" ToolTip="Listed within"/>
+            <ComboBox Grid.Column="2" x:Name="CurrencyBox" Margin="2,0" SelectionChanged="OnControlChanged" ToolTip="Valuation currency"/>
+        </Grid>
 
         <!-- Listings table -->
         <ScrollViewer Grid.Row="4" MaxHeight="260" Margin="8,6,8,0" VerticalScrollBarVisibility="Auto">
