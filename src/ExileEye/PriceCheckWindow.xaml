@@ -39,7 +39,7 @@
             <ItemsControl x:Name="ModList">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
-                        <Grid Margin="8,2">
+                        <Grid Margin="8,2,16,2">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto"/>
                                 <ColumnDefinition Width="*"/>
@@ -79,7 +79,7 @@
             <ItemsControl x:Name="ListingList">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
-                        <Grid Margin="8,2">
+                        <Grid Margin="8,2,16,2">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto"/>
                                 <ColumnDefinition Width="106"/>
