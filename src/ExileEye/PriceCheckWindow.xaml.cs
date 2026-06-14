@@ -136,6 +136,8 @@ public partial class PriceCheckWindow : FluentWindow
                 Quality = l.Quality is { } q ? $"{q}%" : "",
                 Account = l.Account,
                 Age = RelativeAge(l.Listed),
+                Tooltip = l.Description,
+                HasTooltip = l.Description.Length > 0,
             });
         }
     }

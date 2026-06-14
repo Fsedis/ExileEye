@@ -5,9 +5,10 @@ using System.Text.Json;
 
 namespace ExileEye.Core;
 
-/// <summary>One listing: asking price, who's selling, when it was listed, and the item's level/quality.</summary>
+/// <summary>One listing: asking price, who's selling, when it was listed, the item's level/quality,
+/// and a text preview of the item (name, base, mods) for the hover "eye".</summary>
 public sealed record Listing(decimal Amount, string Currency, string Account, DateTimeOffset? Listed,
-    int? ReqLevel = null, int? Quality = null);
+    int? ReqLevel = null, int? Quality = null, string Description = "");
 
 /// <summary>A trade stat filter: the stat id and an optional minimum value.</summary>
 public sealed record TradeStat(string Id, double? Min = null);
@@ -233,9 +234,13 @@ public sealed class TradeClient
                     && acc.TryGetProperty("name", out var an) ? an.GetString() ?? "" : "";
                 DateTimeOffset? listed = listing.TryGetProperty("indexed", out var idx)
                     && DateTimeOffset.TryParse(idx.GetString(), out var dt) ? dt : null;
-                var (reqLevel, quality) = entry.TryGetProperty("item", out var it)
-                    ? ReadItemLevelQuality(it) : (null, null);
-                list.Add(new Listing(amount, currency, account, listed, reqLevel, quality));
+                int? reqLevel = null, quality = null; string desc = "";
+                if (entry.TryGetProperty("item", out var it))
+                {
+                    (reqLevel, quality) = ReadItemLevelQuality(it);
+                    desc = ReadItemText(it);
+                }
+                list.Add(new Listing(amount, currency, account, listed, reqLevel, quality, desc));
             }
         }
         catch (Exception ex) { Console.Error.WriteLine($"[Trade] parse failed: {ex.Message}"); }
@@ -262,6 +267,23 @@ public sealed class TradeClient
                     quality = FirstNumber(p) ?? quality;
             }
         return (reqLevel, quality);
+    }
+
+    // A readable item preview for the hover "eye": name, base, and all mod lines.
+    private static string ReadItemText(JsonElement item)
+    {
+        var sb = new StringBuilder();
+        if (item.TryGetProperty("name", out var nm) && nm.GetString() is { Length: > 0 } name) sb.AppendLine(name);
+        if (item.TryGetProperty("typeLine", out var tl) && tl.GetString() is { Length: > 0 } type) sb.AppendLine(type);
+        bool any = sb.Length > 0;
+        foreach (var key in new[] { "enchantMods", "implicitMods", "runeMods", "explicitMods", "fracturedMods", "craftedMods" })
+        {
+            if (!item.TryGetProperty(key, out var arr) || arr.ValueKind != JsonValueKind.Array) continue;
+            foreach (var m in arr.EnumerateArray())
+                if (m.GetString() is { Length: > 0 } line) { sb.AppendLine(line); any = true; }
+        }
+        if (item.TryGetProperty("corrupted", out var cor) && cor.ValueKind == JsonValueKind.True) sb.AppendLine("Corrupted");
+        return any ? sb.ToString().TrimEnd() : "";
     }
 
     // requirements/properties carry values as [["65", 0]] — pull the first integer out.
