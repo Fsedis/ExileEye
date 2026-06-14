@@ -353,11 +353,11 @@ public partial class MainWindow : FluentWindow
                 }
             }
 
-            var tradeOpts = new TradeOptions(_settings.TradeStatus, _settings.TradeListed);
+            var tradeOpts = new TradeOptions(_settings.TradeStatus, _settings.TradeListed, _settings.TradeCurrency);
 
             if (mods.Count > 0)
             {
-                var win = new PriceCheckWindow(item, mods, _trade, _settings.League, _settings.Language, tradeOpts);
+                var win = new PriceCheckWindow(item, mods, _trade, _settings);
                 win.Show();
                 win.PositionAt(System.Windows.Forms.Cursor.Position);
                 return;

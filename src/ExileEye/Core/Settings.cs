@@ -33,6 +33,13 @@ public sealed class Settings
     // personal trade. TradeListed limits listing age.
     public string TradeStatus { get; set; } = "available";
     public string TradeListed { get; set; } = "";
+    public string TradeCurrency { get; set; } = "";
+
+    public static readonly (string Code, string Label)[] CurrencyOptions =
+    [
+        ("", "Exalted equiv"), ("exalted", "Exalted"), ("divine", "Divine"),
+        ("chaos", "Chaos"), ("regal", "Regal"),
+    ];
 
     /// <summary>POESESSID cookie from pathofexile.com — needed for the instant-buyout (securable)
     /// market and higher rate limits. Stored locally in settings.json.</summary>

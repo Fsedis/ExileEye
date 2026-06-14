@@ -5,8 +5,9 @@ using System.Text.Json;
 
 namespace ExileEye.Core;
 
-/// <summary>One listing: asking price, who's selling, and when it was listed.</summary>
-public sealed record Listing(decimal Amount, string Currency, string Account, DateTimeOffset? Listed);
+/// <summary>One listing: asking price, who's selling, when it was listed, and the item's level/quality.</summary>
+public sealed record Listing(decimal Amount, string Currency, string Account, DateTimeOffset? Listed,
+    int? ReqLevel = null, int? Quality = null);
 
 /// <summary>A trade stat filter: the stat id and an optional minimum value.</summary>
 public sealed record TradeStat(string Id, double? Min = null);
@@ -18,13 +19,32 @@ public sealed record TradeStat(string Id, double? Min = null);
 /// Listed is the "indexed" age filter ("", "1day", "3days", "1week") — fresher listings are the
 /// ones you can actually buy now.
 /// </summary>
-public sealed record TradeOptions(string Status = "available", string Listed = "");
+public sealed record TradeOptions(string Status = "available", string Listed = "", string Currency = "");
+
+/// <summary>An estimated value from the fetched listings, with a spread and a confidence note.</summary>
+public sealed record Estimate(decimal Mid, decimal Low, decimal High, string Currency, string Reliability, int Count);
 
 /// <summary>Price-check result: the searchable item, total listings online, and the cheapest few.</summary>
 public sealed record PriceCheck(string Label, int Total, IReadOnlyList<Listing> Listings, string? BrowseUrl = null)
 {
     /// <summary>The cheapest listing (results come sorted by price ascending).</summary>
     public Listing? Cheapest => Listings.Count > 0 ? Listings[0] : null;
+
+    /// <summary>
+    /// A rough value from the most-listed currency: the median as the estimate, low/high as the
+    /// fetched range. Reliability drops with few listings or a wide spread (the price is uncertain).
+    /// </summary>
+    public Estimate? Estimated()
+    {
+        if (Listings.Count == 0) return null;
+        var group = Listings.GroupBy(l => l.Currency).OrderByDescending(g => g.Count()).First();
+        var amounts = group.Select(l => l.Amount).OrderBy(a => a).ToList();
+        decimal low = amounts[0], high = amounts[^1], mid = amounts[amounts.Count / 2];
+        double spread = (double)(high / Math.Max(low, 0.01m));
+        string reliability = amounts.Count < 4 || spread > 4 ? "low"
+            : amounts.Count < 8 || spread > 2 ? "medium" : "high";
+        return new Estimate(mid, low, high, group.Key, reliability, amounts.Count);
+    }
 }
 
 /// <summary>
@@ -93,9 +113,10 @@ public sealed class TradeClient
         if (!string.IsNullOrEmpty(item.Name)) q["name"] = item.Name;
         if (!string.IsNullOrEmpty(item.Type)) q["type"] = item.Type;
 
-        // trade_filters: listing age. (Sale type defaults to buyout/fixed, so it's omitted.)
+        // trade_filters: listing age + valuation currency. (Sale type defaults to buyout, omitted.)
         var tf = new Dictionary<string, object>();
         if (!string.IsNullOrEmpty(opts.Listed)) tf["indexed"] = new Dictionary<string, string> { ["option"] = opts.Listed };
+        if (!string.IsNullOrEmpty(opts.Currency)) tf["price"] = new Dictionary<string, string> { ["option"] = opts.Currency };
         if (tf.Count > 0)
             q["filters"] = new Dictionary<string, object> { ["trade_filters"] = new Dictionary<string, object> { ["filters"] = tf } };
 
@@ -144,11 +165,50 @@ public sealed class TradeClient
                     && acc.TryGetProperty("name", out var an) ? an.GetString() ?? "" : "";
                 DateTimeOffset? listed = listing.TryGetProperty("indexed", out var idx)
                     && DateTimeOffset.TryParse(idx.GetString(), out var dt) ? dt : null;
-                list.Add(new Listing(amount, currency, account, listed));
+                var (reqLevel, quality) = entry.TryGetProperty("item", out var it)
+                    ? ReadItemLevelQuality(it) : (null, null);
+                list.Add(new Listing(amount, currency, account, listed, reqLevel, quality));
             }
         }
         catch (Exception ex) { Console.Error.WriteLine($"[Trade] parse failed: {ex.Message}"); }
         return list;
+    }
+
+    // Required level (from requirements) and quality % (from properties), both localized — match
+    // loosely by the field name and pull the first number out of the value.
+    private static (int?, int?) ReadItemLevelQuality(JsonElement item)
+    {
+        int? reqLevel = null, quality = null;
+        if (item.TryGetProperty("requirements", out var reqs) && reqs.ValueKind == JsonValueKind.Array)
+            foreach (var r in reqs.EnumerateArray())
+            {
+                var name = (r.TryGetProperty("name", out var n) ? n.GetString() : "")?.ToLowerInvariant() ?? "";
+                if (name.Contains("level") || name.Contains("уров"))
+                    reqLevel = FirstNumber(r) ?? reqLevel;
+            }
+        if (item.TryGetProperty("properties", out var props) && props.ValueKind == JsonValueKind.Array)
+            foreach (var p in props.EnumerateArray())
+            {
+                var name = (p.TryGetProperty("name", out var n) ? n.GetString() : "")?.ToLowerInvariant() ?? "";
+                if (name.Contains("quality") || name.Contains("ачест"))
+                    quality = FirstNumber(p) ?? quality;
+            }
+        return (reqLevel, quality);
+    }
+
+    // requirements/properties carry values as [["65", 0]] — pull the first integer out.
+    private static int? FirstNumber(JsonElement entry)
+    {
+        if (!entry.TryGetProperty("values", out var vals) || vals.ValueKind != JsonValueKind.Array) return null;
+        foreach (var v in vals.EnumerateArray())
+        {
+            if (v.ValueKind == JsonValueKind.Array && v.GetArrayLength() > 0 && v[0].GetString() is { } s)
+            {
+                var digits = new string(s.Where(char.IsDigit).ToArray());
+                if (int.TryParse(digits, out var num)) return num;
+            }
+        }
+        return null;
     }
 
     private async Task<string?> PostJsonAsync(string url, string body)
