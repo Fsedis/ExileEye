@@ -29,6 +29,8 @@ public partial class MainWindow : FluentWindow
     private StatDb? _stats;
     private bool _populating;
     private bool _priceCheckBusy;
+    private TrayIcon? _tray;
+    private bool _exiting;
 
     public MainWindow()
     {
@@ -37,6 +39,21 @@ public partial class MainWindow : FluentWindow
         if (v is not null) VersionLabel.Text = $"v{v.Major}.{v.Minor}.{v.Build}";
         Loaded += async (_, _) => await InitializeAsync();
         SourceInitialized += OnSourceInitialized;
+        _tray = new TrayIcon(RestoreFromTray, ExitApp);
+        StateChanged += (_, _) => { if (WindowState == WindowState.Minimized) Hide(); };
+    }
+
+    private void RestoreFromTray()
+    {
+        Show();
+        WindowState = WindowState.Normal;
+        Activate();
+    }
+
+    private void ExitApp()
+    {
+        _exiting = true;
+        Close();
     }
 
     private void OnSourceInitialized(object? sender, EventArgs e)
@@ -409,12 +426,20 @@ public partial class MainWindow : FluentWindow
 
     private void OnClosing(object sender, System.ComponentModel.CancelEventArgs e)
     {
+        // X keeps ExileEye running in the tray (hotkeys stay live); quit only via the tray's Exit.
+        if (!_exiting)
+        {
+            e.Cancel = true;
+            Hide();
+            return;
+        }
         if (_hwnd != IntPtr.Zero)
         {
             UnregisterHotKey(_hwnd, HotkeyPrice);
             UnregisterHotKey(_hwnd, HotkeyScan);
         }
         StopLoop();
+        _tray?.Dispose();
         _prices?.Dispose();
         _icons?.Dispose();
         _http.Dispose();
