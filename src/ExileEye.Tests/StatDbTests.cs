@@ -19,6 +19,9 @@ public class StatDbTests
             { "label": "Desecrated", "entries": [
               { "id": "desecrated.stat_freeze",    "text": "#% увеличение порога заморозки" }
             ]},
+            { "label": "Surround", "entries": [
+              { "id": "explicit.stat_surround",    "text": "Для окружения требуется на # врагов больше" }
+            ]},
             { "label": "Implicit", "entries": [
               { "id": "implicit.stat_3299347043", "text": "# к максимуму здоровья" }
             ]}
@@ -98,5 +101,14 @@ public class StatDbTests
     public void Match_GroupHeaderLine_ReturnsNull()
     {
         Assert.Null(Build().Match("{ Уникальное свойство — Скорость }"));
+    }
+
+    // The game shows the negated wording ("4 fewer") for a negative roll of a "# more" stat.
+    [Fact]
+    public void Match_NegatedWording_ResolvesCanonicalWithNegativeValue()
+    {
+        var m = Build().Match("Для окружения требуется на 4(4-2) врагов меньше")!;
+        Assert.Equal("explicit.stat_surround", m.Id);
+        Assert.Equal(-4, m.Value);
     }
 }

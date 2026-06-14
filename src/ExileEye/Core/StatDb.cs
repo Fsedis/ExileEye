@@ -102,8 +102,30 @@ public sealed class StatDb
                 System.Globalization.CultureInfo.InvariantCulture, out var v)) values.Add(v);
             return "#";
         });
-        return _byTemplate.TryGetValue(Normalize(template), out var id) ? new StatMatch(id, values) : null;
+        var key = Normalize(template);
+        if (_byTemplate.TryGetValue(key, out var id)) return new StatMatch(id, values);
+
+        // The trade DB stores one canonical wording; the game shows the negated form ("4 fewer"
+        // for value -4 of a "# more" stat). Swap a known negative word to its positive counterpart
+        // and match the canonical stat with negated values.
+        foreach (var (neg, pos) in Antonyms)
+        {
+            if (!key.Contains(neg, StringComparison.Ordinal)) continue;
+            var swapped = key.Replace(neg, pos, StringComparison.Ordinal);
+            if (_byTemplate.TryGetValue(swapped, out var negId))
+                return new StatMatch(negId, values.Select(v => -v).ToList());
+        }
+        return null;
     }
+
+    // Negative↔positive wording pairs for stats whose displayed text flips on a negative roll.
+    private static readonly (string Neg, string Pos)[] Antonyms =
+    [
+        ("меньше", "больше"), ("уменьшение", "увеличение"), ("снижение", "повышение"),
+        ("медленнее", "быстрее"), ("короче", "дольше"),
+        ("reduced", "increased"), ("fewer", "more"), ("less", "more"),
+        ("slower", "faster"), ("shorter", "longer"),
+    ];
 
     // Templates sometimes carry trailing tags like " (implicit)"/" (рунное)"; drop a trailing
     // parenthetical and collapse whitespace so item lines and templates line up.
