@@ -49,9 +49,12 @@
                                       Click="OnControlChanged" VerticalAlignment="Center" Margin="0,0,8,0"/>
                             <TextBlock Grid.Column="1" Text="{Binding Text}" TextWrapping="Wrap"
                                        VerticalAlignment="Center" Opacity="0.9" FontSize="12"/>
-                            <ui:TextBox Grid.Column="2" Text="{Binding MinText, Mode=TwoWay}"
-                                        Width="64" Margin="8,0,0,0" PlaceholderText="min" VerticalAlignment="Center"
-                                        ClearButtonEnabled="False" TextAlignment="Center"/>
+                            <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="8,0,0,0">
+                                <ui:TextBox Text="{Binding MinText, Mode=TwoWay}" Width="58" PlaceholderText="min"
+                                            VerticalAlignment="Center" ClearButtonEnabled="False" TextAlignment="Center"/>
+                                <ui:TextBox Text="{Binding MaxText, Mode=TwoWay}" Width="58" Margin="4,0,0,0" PlaceholderText="max"
+                                            VerticalAlignment="Center" ClearButtonEnabled="False" TextAlignment="Center"/>
+                            </StackPanel>
                         </Grid>
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>

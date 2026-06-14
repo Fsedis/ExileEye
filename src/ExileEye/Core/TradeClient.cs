@@ -10,8 +10,8 @@ namespace ExileEye.Core;
 public sealed record Listing(decimal Amount, string Currency, string Account, DateTimeOffset? Listed,
     int? ReqLevel = null, int? Quality = null, string Description = "");
 
-/// <summary>A trade stat filter: the stat id and an optional minimum value.</summary>
-public sealed record TradeStat(string Id, double? Min = null);
+/// <summary>A trade stat filter: the stat id and optional min/max value bounds.</summary>
+public sealed record TradeStat(string Id, double? Min = null, double? Max = null);
 
 /// <summary>
 /// Where/how to search. Status is the trade market/availability (labels from EE2):
@@ -199,8 +199,13 @@ public sealed class TradeClient
                     ["filters"] = stats.Select(s =>
                     {
                         var f = new Dictionary<string, object> { ["id"] = s.Id };
-                        if (s.Min is { } min)
-                            f["value"] = new Dictionary<string, object> { ["min"] = min };
+                        if (s.Min is not null || s.Max is not null)
+                        {
+                            var value = new Dictionary<string, object>();
+                            if (s.Min is { } min) value["min"] = min;
+                            if (s.Max is { } max) value["max"] = max;
+                            f["value"] = value;
+                        }
                         return f;
                     }).ToArray(),
                 },

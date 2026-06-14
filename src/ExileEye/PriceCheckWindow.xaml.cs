@@ -23,6 +23,7 @@ public partial class PriceCheckWindow : FluentWindow
         public double Value { get; init; }
         public bool Include { get; set; }
         public string MinText { get; set; } = "";
+        public string MaxText { get; set; } = "";
     }
 
     private const int FirstPage = 20, NextPage = 10;
@@ -96,8 +97,8 @@ public partial class PriceCheckWindow : FluentWindow
         SearchButton.IsEnabled = false;
         try
         {
-            var stats = _mods.Where(m => m.Include).Select(m => new TradeStat(m.Id,
-                double.TryParse(m.MinText, NumberStyles.Any, CultureInfo.InvariantCulture, out var v) ? v : null)).ToList();
+            var stats = _mods.Where(m => m.Include)
+                .Select(m => new TradeStat(m.Id, ParseNum(m.MinText), ParseNum(m.MaxText))).ToList();
             var opts = new TradeOptions(_settings.TradeStatus, _settings.TradeListed, _settings.TradeCurrency);
             EstimateText.Text = "Searching…"; RangeText.Text = ""; StatusLine.Text = "";
             _modCount = stats.Count;
@@ -157,6 +158,9 @@ public partial class PriceCheckWindow : FluentWindow
         if (_browseUrl is null) return;
         try { Process.Start(new ProcessStartInfo(_browseUrl) { UseShellExecute = true }); } catch { }
     }
+
+    private static double? ParseNum(string s) =>
+        double.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, out var v) ? v : null;
 
     private static string Format(decimal d) => d.ToString("0.##", CultureInfo.InvariantCulture);
 
