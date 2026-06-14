@@ -84,8 +84,19 @@ public sealed class StatDb
     /// <summary>Resolve one mod line to a stat, or null if it isn't a recognized stat.</summary>
     public StatMatch? Match(string line)
     {
+        line = line.Trim();
+        // Group headers ("{ Уникальное свойство — ... }") and dividers aren't mods.
+        if (line.Length == 0 || line.StartsWith("{") || line.All(c => c == '-')) return null;
+
+        // PoE2 prints the affix roll range right after the value — "23(20-30)%". Drop the
+        // parenthetical range so the current roll ("23") is what we templatize and read.
+        line = Regex.Replace(line, @"\((?:\d+(?:\.\d+)?)(?:\s*[-–]\s*\d+(?:\.\d+)?)+\)", "");
+        // Strip the "unchangeable value" marker some unique stats carry.
+        line = Regex.Replace(line, @"\s*[—-]\s*(?:Неизменяемое значение|Unchangeable Value)\s*$",
+            "", RegexOptions.IgnoreCase);
+
         var values = new List<double>();
-        var template = Regex.Replace(line.Trim(), @"[+-]?\d+(?:\.\d+)?", m =>
+        var template = Regex.Replace(line, @"[+-]?\d+(?:\.\d+)?", m =>
         {
             if (double.TryParse(m.Value, System.Globalization.NumberStyles.Any,
                 System.Globalization.CultureInfo.InvariantCulture, out var v)) values.Add(v);
