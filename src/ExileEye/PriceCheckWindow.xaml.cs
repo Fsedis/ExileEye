@@ -92,16 +92,19 @@ public partial class PriceCheckWindow : FluentWindow
             ResultText.Text = "Searching…";
 
             var result = await _trade.CheckAsync(_item, _league, _language, stats.Count > 0 ? stats : null, _options);
-            if (result is null) { ResultText.Text = "No data (rate-limited or offline)."; return; }
+            if (result is null) { ResultText.Text = "No data (rate-limited or offline)."; ListingList.ItemsSource = null; return; }
 
             _browseUrl = result.BrowseUrl;
             BrowserButton.IsEnabled = _browseUrl is not null;
 
-            var typ = result.Typical();
             string scope = stats.Count > 0 ? $"{stats.Count} mods" : "base type";
-            ResultText.Text = typ is null
-                ? $"{result.Total} online · no price · {scope}"
-                : $"≈ {Format(typ.Amount)} {typ.Currency}  ·  {result.Total} online  ·  {scope}";
+            ResultText.Text = $"{result.Total} online · {scope} · cheapest first";
+            ListingList.ItemsSource = result.Listings.Select(l => new
+            {
+                Price = $"{Format(l.Amount)} {ShortCurrency(l.Currency)}",
+                Account = l.Account,
+                Age = RelativeAge(l.Listed),
+            }).ToList();
         }
         finally
         {
@@ -118,6 +121,22 @@ public partial class PriceCheckWindow : FluentWindow
     }
 
     private static string Format(decimal d) => d.ToString("0.##", CultureInfo.InvariantCulture);
+
+    private static string ShortCurrency(string c) => c switch
+    {
+        "exalted" => "ex", "divine" => "div", "chaos" => "chaos", "regal" => "regal",
+        "annul" => "annul", "vaal" => "vaal", "alch" => "alch", "aug" => "aug",
+        "transmute" => "transmute", "mirror" => "mirror", _ => c,
+    };
+
+    private static string RelativeAge(DateTimeOffset? listed)
+    {
+        if (listed is not { } t) return "";
+        var d = DateTimeOffset.Now - t;
+        if (d.TotalMinutes < 60) return $"{(int)Math.Max(1, d.TotalMinutes)}m";
+        if (d.TotalHours < 24) return $"{(int)d.TotalHours}h";
+        return $"{(int)d.TotalDays}d";
+    }
 
     protected override void OnKeyDown(System.Windows.Input.KeyEventArgs e)
     {

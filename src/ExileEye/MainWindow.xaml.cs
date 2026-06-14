@@ -339,10 +339,10 @@ public partial class MainWindow : FluentWindow
             var result = await _trade.CheckAsync(item, _settings.League, _settings.Language, null, tradeOpts);
             var at = System.Windows.Forms.Cursor.Position;
             if (result is null) { PriceToast.Show(at, label, "no data (rate-limited or offline)", grey); return; }
-            var typ = result.Typical();
-            string body = typ is null
+            var cheap = result.Cheapest;
+            string body = cheap is null
                 ? $"{result.Total} online · no price"
-                : $"{Format(typ.Amount)} {typ.Currency} · {result.Total} online";
+                : $"from {Format(cheap.Amount)} {cheap.Currency} · {result.Total} online";
             PriceToast.Show(at, label, body, result.Total > 0 ? green : grey);
         }
         finally { _priceCheckBusy = false; }

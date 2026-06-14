@@ -5,8 +5,8 @@ using System.Text.Json;
 
 namespace ExileEye.Core;
 
-/// <summary>One listing's asking price.</summary>
-public sealed record Listing(decimal Amount, string Currency);
+/// <summary>One listing: asking price, who's selling, and when it was listed.</summary>
+public sealed record Listing(decimal Amount, string Currency, string Account, DateTimeOffset? Listed);
 
 /// <summary>A trade stat filter: the stat id and an optional minimum value.</summary>
 public sealed record TradeStat(string Id, double? Min = null);
@@ -23,15 +23,8 @@ public sealed record TradeOptions(string Status = "available", string Listed = "
 /// <summary>Price-check result: the searchable item, total listings online, and the cheapest few.</summary>
 public sealed record PriceCheck(string Label, int Total, IReadOnlyList<Listing> Listings, string? BrowseUrl = null)
 {
-    /// <summary>A representative price: the modal currency's listings, their low end.</summary>
-    public Listing? Typical()
-    {
-        if (Listings.Count == 0) return null;
-        // Most-listed currency, then the lower-middle of those (skips the odd lowball).
-        var byCur = Listings.GroupBy(l => l.Currency).OrderByDescending(g => g.Count()).First()
-                            .OrderBy(l => l.Amount).ToList();
-        return byCur[Math.Min(byCur.Count - 1, byCur.Count / 3)];
-    }
+    /// <summary>The cheapest listing (results come sorted by price ascending).</summary>
+    public Listing? Cheapest => Listings.Count > 0 ? Listings[0] : null;
 }
 
 /// <summary>
@@ -141,7 +134,13 @@ public sealed class TradeClient
                 if (price.ValueKind != JsonValueKind.Object) continue;
                 decimal amount = price.TryGetProperty("amount", out var a) ? a.GetDecimal() : 0m;
                 string currency = price.TryGetProperty("currency", out var c) ? c.GetString() ?? "" : "";
-                if (amount > 0 && currency.Length > 0) list.Add(new Listing(amount, currency));
+                if (amount <= 0 || currency.Length == 0) continue;
+
+                string account = listing.TryGetProperty("account", out var acc)
+                    && acc.TryGetProperty("name", out var an) ? an.GetString() ?? "" : "";
+                DateTimeOffset? listed = listing.TryGetProperty("indexed", out var idx)
+                    && DateTimeOffset.TryParse(idx.GetString(), out var dt) ? dt : null;
+                list.Add(new Listing(amount, currency, account, listed));
             }
         }
         catch (Exception ex) { Console.Error.WriteLine($"[Trade] parse failed: {ex.Message}"); }

@@ -107,9 +107,9 @@ public partial class App : System.Windows.Application
             else
             {
                 lines.Add($"  {result.Label}: {result.Total} online, {result.Listings.Count} fetched");
-                foreach (var l in result.Listings) lines.Add($"    {l.Amount} {l.Currency}");
-                var typ = result.Typical();
-                lines.Add($"  typical: {(typ is null ? "—" : $"{typ.Amount} {typ.Currency}")}");
+                foreach (var l in result.Listings) lines.Add($"    {l.Amount} {l.Currency} ({l.Account})");
+                var cheap = result.Cheapest;
+                lines.Add($"  cheapest: {(cheap is null ? "—" : $"{cheap.Amount} {cheap.Currency}")}");
             }
         }
         catch (Exception ex) { lines.Add($"[pricecheck] ERROR {ex}"); }

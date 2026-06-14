@@ -55,8 +55,24 @@
                 <ui:Button x:Name="BrowserButton" Content="Open in browser" Icon="{ui:SymbolIcon Open24}"
                            Margin="8,0,0,0" Click="OnOpenBrowser" IsEnabled="False"/>
             </StackPanel>
-            <TextBlock x:Name="ResultText" FontSize="14" TextWrapping="Wrap" Opacity="0.9"
-                       Text="Searching…"/>
+            <TextBlock x:Name="ResultText" FontSize="13" TextWrapping="Wrap" Opacity="0.7"
+                       Text="Searching…" Margin="0,0,0,6"/>
+            <ItemsControl x:Name="ListingList">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Grid Margin="0,2">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="110"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="{Binding Price}" FontWeight="SemiBold" FontSize="14"/>
+                            <TextBlock Grid.Column="1" Text="{Binding Account}" Opacity="0.6" TextTrimming="CharacterEllipsis"/>
+                            <TextBlock Grid.Column="2" Text="{Binding Age}" Opacity="0.45" FontSize="12"/>
+                        </Grid>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
         </StackPanel>
     </Grid>
 </ui:FluentWindow>
