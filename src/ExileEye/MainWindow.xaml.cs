@@ -354,36 +354,42 @@ public partial class MainWindow : FluentWindow
             }
 
             var label = item.Name ?? item.Type ?? "?";
-            PriceToast.Show(System.Windows.Forms.Cursor.Position, label, "checking price…", accent);
-
-            // For rares, search by the item's mods (presence) so the price reflects the item, not
-            // just its base type; fall back to base-type-only if that combination has no listings.
-            IReadOnlyList<string>? statIds = null;
-            if (item.Rarity == "rare" && _stats is { Count: > 0 })
-            {
-                statIds = copied.Replace("\r", "").Split('\n')
-                    .Select(l => _stats.Match(l.Trim())?.Id)
-                    .Where(id => id is not null).Select(id => id!).Distinct().ToList();
-                if (statIds.Count == 0) statIds = null;
-            }
-
-            var result = await _trade.CheckAsync(item, _settings.League, _settings.Language, statIds);
-            bool byMods = statIds is not null && result is { Total: > 0 };
-            if (statIds is not null && result is { Total: 0 })
-                result = await _trade.CheckAsync(item, _settings.League, _settings.Language);   // base-type fallback
             RestoreClipboard(backup);
 
-            var at = System.Windows.Forms.Cursor.Position;
-            if (result is null)
+            // Recognized mod lines → the interactive window (toggle mods, set minimums, search).
+            var mods = new List<PriceCheckWindow.ModFilter>();
+            if (_stats is { Count: > 0 })
             {
-                PriceToast.Show(at, label, "no data (rate-limited or offline)", grey);
+                foreach (var line in copied.Replace("\r", "").Split('\n'))
+                {
+                    var m = _stats.Match(line.Trim());
+                    if (m is null || mods.Any(x => x.Id == m.Id)) continue;
+                    mods.Add(new PriceCheckWindow.ModFilter
+                    {
+                        Text = line.Trim(), Id = m.Id, Value = m.Value,
+                        Include = false,
+                        MinText = m.Value == 0 ? "" : Format((decimal)m.Value),
+                    });
+                }
+            }
+
+            if (mods.Count > 0)
+            {
+                var win = new PriceCheckWindow(item, mods, _trade, _settings.League, _settings.Language);
+                win.Show();
+                win.PositionAt(System.Windows.Forms.Cursor.Position);
                 return;
             }
+
+            // No mods (currency, gems, uniques) → quick toast price.
+            PriceToast.Show(System.Windows.Forms.Cursor.Position, label, "checking price…", accent);
+            var result = await _trade.CheckAsync(item, _settings.League, _settings.Language);
+            var at = System.Windows.Forms.Cursor.Position;
+            if (result is null) { PriceToast.Show(at, label, "no data (rate-limited or offline)", grey); return; }
             var typ = result.Typical();
-            string scope = byMods ? $"{statIds!.Count} mods" : "base type";
             string body = typ is null
                 ? $"{result.Total} online · no price"
-                : $"{Format(typ.Amount)} {typ.Currency} · {result.Total} online · {scope}";
+                : $"{Format(typ.Amount)} {typ.Currency} · {result.Total} online";
             PriceToast.Show(at, label, body, result.Total > 0 ? green : grey);
         }
         finally { _priceCheckBusy = false; }

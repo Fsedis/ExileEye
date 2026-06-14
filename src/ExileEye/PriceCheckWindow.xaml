@@ -1,0 +1,62 @@
+<ui:FluentWindow x:Class="ExileEye.PriceCheckWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+        Title="Price check"
+        Width="460" SizeToContent="Height" MaxHeight="700"
+        WindowStartupLocation="Manual"
+        ExtendsContentIntoTitleBar="True"
+        WindowBackdropType="Mica"
+        Topmost="True" ShowInTaskbar="False"
+        WindowCornerPreference="Round">
+
+    <Grid Margin="0">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <ui:TitleBar Grid.Row="0" Title="Price check" Icon="{x:Null}"/>
+
+        <StackPanel Grid.Row="1" Margin="16,4,16,8">
+            <TextBlock x:Name="ItemLabel" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap"/>
+            <TextBlock x:Name="ItemSub" Opacity="0.6" FontSize="12"/>
+        </StackPanel>
+
+        <ScrollViewer Grid.Row="2" MaxHeight="380" Margin="8,0,8,0" VerticalScrollBarVisibility="Auto">
+            <ItemsControl x:Name="ModList">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Grid Margin="8,3">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <CheckBox Grid.Column="0" IsChecked="{Binding Include, Mode=TwoWay}"
+                                      VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <TextBlock Grid.Column="1" Text="{Binding Text}" TextWrapping="Wrap"
+                                       VerticalAlignment="Center" Opacity="0.9"/>
+                            <ui:TextBox Grid.Column="2" Text="{Binding MinText, Mode=TwoWay}"
+                                        Width="56" Margin="8,0,0,0" PlaceholderText="min"
+                                        VerticalAlignment="Center"/>
+                        </Grid>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+
+        <StackPanel Grid.Row="3" Margin="16,8,16,16">
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                <ui:Button x:Name="SearchButton" Content="Search" Icon="{ui:SymbolIcon Search24}"
+                           Appearance="Primary" Click="OnSearch"/>
+                <ui:Button x:Name="BrowserButton" Content="Open in browser" Icon="{ui:SymbolIcon Open24}"
+                           Margin="8,0,0,0" Click="OnOpenBrowser" IsEnabled="False"/>
+            </StackPanel>
+            <TextBlock x:Name="ResultText" FontSize="14" TextWrapping="Wrap" Opacity="0.9"
+                       Text="Searching…"/>
+        </StackPanel>
+    </Grid>
+</ui:FluentWindow>

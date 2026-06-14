@@ -8,8 +8,11 @@ namespace ExileEye.Core;
 /// <summary>One listing's asking price.</summary>
 public sealed record Listing(decimal Amount, string Currency);
 
+/// <summary>A trade stat filter: the stat id and an optional minimum value.</summary>
+public sealed record TradeStat(string Id, double? Min = null);
+
 /// <summary>Price-check result: the searchable item, total listings online, and the cheapest few.</summary>
-public sealed record PriceCheck(string Label, int Total, IReadOnlyList<Listing> Listings)
+public sealed record PriceCheck(string Label, int Total, IReadOnlyList<Listing> Listings, string? BrowseUrl = null)
 {
     /// <summary>A representative price: the modal currency's listings, their low end.</summary>
     public Listing? Typical()
@@ -43,12 +46,13 @@ public sealed class TradeClient
         (language == "ru" ? "https://ru.pathofexile.com" : "https://www.pathofexile.com") + "/api/trade2";
 
     public async Task<PriceCheck?> CheckAsync(ParsedItem item, string league, string language = "en",
-        IReadOnlyList<string>? statIds = null)
+        IReadOnlyList<TradeStat>? stats = null)
     {
         if (!item.IsSearchable) return null;
         var baseUrl = BaseFor(language);
+        var label = item.Name ?? item.Type ?? "?";
 
-        var query = BuildQuery(item, statIds);
+        var query = BuildQuery(item, stats);
         var searchUrl = $"{baseUrl}/search/{Uri.EscapeDataString(league)}";
         var search = await PostJsonAsync(searchUrl, query);
         if (search is null) return null;
@@ -57,22 +61,23 @@ public sealed class TradeClient
         var root = doc.RootElement;
         if (!root.TryGetProperty("id", out var idEl) || idEl.GetString() is not { } searchId) return null;
         int total = root.TryGetProperty("total", out var t) ? t.GetInt32() : 0;
+        // Browseable trade page for "open in browser".
+        var browse = $"{BaseFor(language).Replace("/api/trade2", "/trade2")}/search/{Uri.EscapeDataString(league)}/{searchId}";
         if (!root.TryGetProperty("result", out var resultArr) || resultArr.GetArrayLength() == 0)
-            return new PriceCheck(item.Name ?? item.Type ?? "?", total, []);
+            return new PriceCheck(label, total, [], browse);
 
         var ids = resultArr.EnumerateArray().Take(FetchBatch).Select(e => e.GetString()).Where(s => s is not null).ToList();
         var fetchUrl = $"{baseUrl}/fetch/{string.Join(',', ids)}?query={searchId}";
         var fetched = await GetAsync(fetchUrl);
-        if (fetched is null) return new PriceCheck(item.Name ?? item.Type ?? "?", total, []);
+        if (fetched is null) return new PriceCheck(label, total, [], browse);
 
-        var listings = ParseListings(fetched);
-        return new PriceCheck(item.Name ?? item.Type ?? "?", total, listings);
+        return new PriceCheck(label, total, ParseListings(fetched), browse);
     }
 
     // {"query":{"status":{"option":"online"}, name?/type?, stats?}, "sort":{"price":"asc"}}
-    // Stat filters are presence-only ("has this mod", any value) — a rough but populated price for
-    // a rare; an exact value search on every mod almost never has comparable listings.
-    private static string BuildQuery(ParsedItem item, IReadOnlyList<string>? statIds)
+    // Each stat filter carries its id and an optional min value (the user picks which mods and
+    // their minimums in the price-check window).
+    private static string BuildQuery(ParsedItem item, IReadOnlyList<TradeStat>? stats)
     {
         var q = new Dictionary<string, object>
         {
@@ -80,14 +85,20 @@ public sealed class TradeClient
         };
         if (!string.IsNullOrEmpty(item.Name)) q["name"] = item.Name;
         if (!string.IsNullOrEmpty(item.Type)) q["type"] = item.Type;
-        if (statIds is { Count: > 0 })
+        if (stats is { Count: > 0 })
         {
             q["stats"] = new[]
             {
                 new Dictionary<string, object>
                 {
                     ["type"] = "and",
-                    ["filters"] = statIds.Select(id => new Dictionary<string, object> { ["id"] = id }).ToArray(),
+                    ["filters"] = stats.Select(s =>
+                    {
+                        var f = new Dictionary<string, object> { ["id"] = s.Id };
+                        if (s.Min is { } min)
+                            f["value"] = new Dictionary<string, object> { ["min"] = min };
+                        return f;
+                    }).ToArray(),
                 },
             };
         }
