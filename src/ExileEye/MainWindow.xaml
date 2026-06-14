@@ -25,7 +25,7 @@
                 <ui:SymbolIcon Symbol="Eye24" FontSize="26" VerticalAlignment="Center"/>
                 <StackPanel Margin="10,0,0,0">
                     <TextBlock Text="ExileEye" FontSize="20" FontWeight="SemiBold"/>
-                    <TextBlock Text="Live poe.ninja prices over your game panel" Opacity="0.55" FontSize="12"/>
+                    <TextBlock x:Name="SubtitleText" Text="Live poe.ninja prices over your game panel" Opacity="0.55" FontSize="12"/>
                 </StackPanel>
             </StackPanel>
 
@@ -40,12 +40,12 @@
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
-                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Game language" VerticalAlignment="Center" Opacity="0.8"/>
+                    <TextBlock x:Name="GameLangLabel" Grid.Row="0" Grid.Column="0" Text="Game language" VerticalAlignment="Center" Opacity="0.8"/>
                     <ComboBox Grid.Row="0" Grid.Column="1" x:Name="LanguageBox" Margin="0,2"
                               SelectionChanged="OnLanguageChanged"
                               ToolTip="Language your PoE2 client runs in — item names are read in it"/>
 
-                    <TextBlock Grid.Row="1" Grid.Column="0" Text="League" VerticalAlignment="Center" Opacity="0.8"/>
+                    <TextBlock x:Name="LeagueLabel" Grid.Row="1" Grid.Column="0" Text="League" VerticalAlignment="Center" Opacity="0.8"/>
                     <ComboBox Grid.Row="1" Grid.Column="1" x:Name="LeagueBox" Margin="0,2"
                               SelectionChanged="OnLeagueChanged"/>
                 </Grid>
@@ -63,15 +63,15 @@
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
-                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Price check" VerticalAlignment="Center" Opacity="0.8"/>
+                    <TextBlock x:Name="PriceCheckLabel" Grid.Row="0" Grid.Column="0" Text="Price check" VerticalAlignment="Center" Opacity="0.8"/>
                     <TextBlock Grid.Row="0" Grid.Column="1" x:Name="PriceHotkeyText" Text="Ctrl+D"
                                VerticalAlignment="Center" FontFamily="Consolas" Opacity="0.7"/>
-                    <ui:Button Grid.Row="0" Grid.Column="2" Content="Rebind" Click="OnRebindPrice" Margin="0,0,0,4"/>
+                    <ui:Button x:Name="RebindPriceBtn" Grid.Row="0" Grid.Column="2" Content="Rebind" Click="OnRebindPrice" Margin="0,0,0,4"/>
 
-                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Scan panel" VerticalAlignment="Center" Opacity="0.8"/>
+                    <TextBlock x:Name="ScanPanelLabel" Grid.Row="1" Grid.Column="0" Text="Scan panel" VerticalAlignment="Center" Opacity="0.8"/>
                     <TextBlock Grid.Row="1" Grid.Column="1" x:Name="ScanHotkeyText" Text="Ctrl+S"
                                VerticalAlignment="Center" FontFamily="Consolas" Opacity="0.7"/>
-                    <ui:Button Grid.Row="1" Grid.Column="2" Content="Rebind" Click="OnRebindScan"/>
+                    <ui:Button x:Name="RebindScanBtn" Grid.Row="1" Grid.Column="2" Content="Rebind" Click="OnRebindScan"/>
                 </Grid>
             </ui:Card>
 
@@ -87,17 +87,17 @@
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
-                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Listings" VerticalAlignment="Center" Opacity="0.8"/>
+                    <TextBlock x:Name="ListingsLabel" Grid.Row="0" Grid.Column="0" Text="Listings" VerticalAlignment="Center" Opacity="0.8"/>
                     <ComboBox Grid.Row="0" Grid.Column="1" x:Name="StatusBox" Margin="0,2"
                               SelectionChanged="OnTradeOptionChanged"
                               ToolTip="Trade market: Instant buyout = securable (buy now), Online = personal trade (whisper the seller)."/>
 
-                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Listed within" VerticalAlignment="Center" Opacity="0.8"/>
+                    <TextBlock x:Name="ListedLabel" Grid.Row="1" Grid.Column="0" Text="Listed within" VerticalAlignment="Center" Opacity="0.8"/>
                     <ComboBox Grid.Row="1" Grid.Column="1" x:Name="ListedBox" Margin="0,2"
                               SelectionChanged="OnTradeOptionChanged"
                               ToolTip="Only listings posted within this window — fresher listings are more likely buyable now."/>
 
-                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Account" VerticalAlignment="Center" Opacity="0.8"/>
+                    <TextBlock x:Name="AccountLabel" Grid.Row="2" Grid.Column="0" Text="Account" VerticalAlignment="Center" Opacity="0.8"/>
                     <Grid Grid.Row="2" Grid.Column="1" Margin="0,2">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>

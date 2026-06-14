@@ -52,6 +52,14 @@ public partial class PriceCheckWindow : FluentWindow
         ModList.ItemsSource = _mods;
         ListingList.ItemsSource = _listingRows;
 
+        Title = Loc.T("window_title");
+        EstimateText.Text = Loc.T("searching");
+        SearchButton.Content = Loc.T("search");
+        BrowserButton.Content = Loc.T("open_browser");
+        StatusBox.ToolTip = Loc.T("market");
+        ListedBox.ToolTip = Loc.T("listed_within");
+        CurrencyBox.ToolTip = Loc.T("valuation_currency");
+
         StatusBox.ItemsSource = Settings.StatusOptions.Select(o => o.Label);
         StatusBox.SelectedIndex = IndexOf(Settings.StatusOptions, _settings.TradeStatus);
         ListedBox.ItemsSource = Settings.ListedOptions.Select(o => o.Label);
@@ -100,13 +108,13 @@ public partial class PriceCheckWindow : FluentWindow
             var stats = _mods.Where(m => m.Include)
                 .Select(m => new TradeStat(m.Id, ParseNum(m.MinText), ParseNum(m.MaxText))).ToList();
             var opts = new TradeOptions(_settings.TradeStatus, _settings.TradeListed, _settings.TradeCurrency);
-            EstimateText.Text = "Searching…"; RangeText.Text = ""; StatusLine.Text = "";
+            EstimateText.Text = Loc.T("searching"); RangeText.Text = ""; StatusLine.Text = "";
             _modCount = stats.Count;
 
             _listingRows.Clear();
             _session = await _trade.SearchAsync(_item, _settings.League, _settings.Language,
                 stats.Count > 0 ? stats : null, opts);
-            if (_session is null) { EstimateText.Text = "No data (rate-limited or offline)"; return; }
+            if (_session is null) { EstimateText.Text = Loc.T("no_data"); return; }
 
             _browseUrl = _session.BrowseUrl;
             BrowserButton.IsEnabled = _browseUrl is not null;
@@ -123,10 +131,12 @@ public partial class PriceCheckWindow : FluentWindow
     {
         if (_session is null) return;
         var est = _session.Estimated();
-        EstimateText.Text = est is null ? "no price" : $"≈ {Format(est.Mid)} {ShortCurrency(est.Currency)}";
-        RangeText.Text = est is null ? "" : $"range {Format(est.Low)}–{Format(est.High)} · reliability {est.Reliability}";
-        StatusLine.Text = $"{_session.Total} online · {(_modCount > 0 ? $"{_modCount} mods" : "base type")}"
-            + (_session.HasMore ? " · scroll for more" : "");
+        EstimateText.Text = est is null ? Loc.T("no_price") : $"≈ {Format(est.Mid)} {ShortCurrency(est.Currency)}";
+        RangeText.Text = est is null ? ""
+            : $"{Loc.T("range")} {Format(est.Low)}–{Format(est.High)} · {Loc.T("reliability")} {Loc.T("rel_" + est.Reliability)}";
+        StatusLine.Text = $"{_session.Total} {Loc.T("online")} · "
+            + (_modCount > 0 ? $"{_modCount} {Loc.T("mods")}" : Loc.T("base_type"))
+            + (_session.HasMore ? $" · {Loc.T("scroll_more")}" : "");
         for (int i = _listingRows.Count; i < _session.Listings.Count; i++)
         {
             var l = _session.Listings[i];

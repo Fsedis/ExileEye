@@ -39,7 +39,6 @@ public partial class MainWindow : FluentWindow
         if (v is not null) VersionLabel.Text = $"v{v.Major}.{v.Minor}.{v.Build}";
         Loaded += async (_, _) => await InitializeAsync();
         SourceInitialized += OnSourceInitialized;
-        _tray = new TrayIcon(RestoreFromTray, ExitApp);
         StateChanged += (_, _) => { if (WindowState == WindowState.Minimized) Hide(); };
     }
 
@@ -139,6 +138,9 @@ public partial class MainWindow : FluentWindow
     private async Task InitializeAsync()
     {
         _settings = Settings.Load();
+        Loc.Lang = _settings.Language;
+        ApplyLoc();
+        _tray ??= new TrayIcon(RestoreFromTray, ExitApp);
         RegisterHotkeys();   // SourceInitialized ran with defaults; re-arm with the saved bindings
 
         // Resolve the league list first (one quick call), then fetch prices exactly once for
@@ -174,7 +176,7 @@ public partial class MainWindow : FluentWindow
 
     private async Task ReloadPricesAsync()
     {
-        SetStatus(InfoBarSeverity.Informational, "Loading", "Fetching prices from poe.ninja…");
+        SetStatus(InfoBarSeverity.Informational, Loc.T("loading"), Loc.T("fetching_prices"));
 
         _prices?.Dispose();
         _prices = new PriceBook(_http);
@@ -195,14 +197,12 @@ public partial class MainWindow : FluentWindow
 
         if (!ocrModel.Result)
         {
-            SetStatus(InfoBarSeverity.Error, "OCR model missing",
-                "Couldn't download the Russian OCR data — check your connection and reselect the language.");
+            SetStatus(InfoBarSeverity.Error, Loc.T("ocr_missing"), Loc.T("ocr_missing_msg"));
             return;
         }
         if (_prices.Count == 0)
         {
-            SetStatus(InfoBarSeverity.Warning, "No prices",
-                "poe.ninja returned nothing — check your connection or the selected league.");
+            SetStatus(InfoBarSeverity.Warning, Loc.T("no_prices"), Loc.T("no_prices_msg"));
             return;
         }
 
@@ -215,8 +215,9 @@ public partial class MainWindow : FluentWindow
         string at = _prices.FetchedAt is { } t ? t.ToString("HH:mm") : "—";
         string scanKey = FormatHotkey(_settings.ScanHotkeyMods, _settings.ScanHotkeyVk);
         string priceKey = FormatHotkey(_settings.PriceHotkeyMods, _settings.PriceHotkeyVk);
-        SetStatus(InfoBarSeverity.Success, "Ready",
-            $"{_prices.Count} items priced · updated {at} · {scanKey} scans a panel · {priceKey} prices the hovered item");
+        SetStatus(InfoBarSeverity.Success, Loc.T("ready"),
+            $"{_prices.Count} {Loc.T("items_priced")} · {Loc.T("updated")} {at} · " +
+            $"{scanKey} {Loc.T("scans_panel")} · {priceKey} {Loc.T("prices_item")}");
     }
 
     private void SetStatus(InfoBarSeverity severity, string title, string message)
@@ -224,6 +225,26 @@ public partial class MainWindow : FluentWindow
         StatusBar.Severity = severity;
         StatusBar.Title = title;
         StatusBar.Message = message;
+    }
+
+    private void ApplyLoc()
+    {
+        SubtitleText.Text = Loc.T("subtitle");
+        GameLangLabel.Text = Loc.T("game_language");
+        LanguageBox.ToolTip = Loc.T("game_language_tip");
+        LeagueLabel.Text = Loc.T("league");
+        PriceCheckLabel.Text = Loc.T("price_check");
+        ScanPanelLabel.Text = Loc.T("scan_panel");
+        RebindPriceBtn.Content = Loc.T("rebind");
+        RebindScanBtn.Content = Loc.T("rebind");
+        ListingsLabel.Text = Loc.T("listings");
+        StatusBox.ToolTip = Loc.T("listings_tip");
+        ListedLabel.Text = Loc.T("listed_within");
+        ListedBox.ToolTip = Loc.T("listed_tip");
+        AccountLabel.Text = Loc.T("account");
+        SessionBox.PlaceholderText = Loc.T("session_placeholder");
+        SessionBox.ToolTip = Loc.T("session_tip");
+        LoginButton.Content = Loc.T("login");
     }
 
     /// <summary>Ctrl+S: scan the panel, auto-starting the engine if it isn't running yet.</summary>
@@ -274,7 +295,7 @@ public partial class MainWindow : FluentWindow
             SessionBox.Text = sid;
             _populating = false;
             ApplySession(sid);
-            SetStatus(InfoBarSeverity.Success, "Logged in", "Session captured — instant buyout is available.");
+            SetStatus(InfoBarSeverity.Success, Loc.T("logged_in"), Loc.T("logged_in_msg"));
         }
     }
 
@@ -293,6 +314,8 @@ public partial class MainWindow : FluentWindow
         if (code == _settings.Language) return;
         StopLoop();   // the OCR engine's language is fixed at start
         _settings.Language = code;
+        Loc.Lang = code;
+        ApplyLoc();
         _settings.Save();
         await ReloadPricesAsync();   // re-applies localized aliases, downloads the OCR model
     }

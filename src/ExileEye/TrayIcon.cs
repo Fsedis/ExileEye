@@ -16,9 +16,9 @@ public sealed class TrayIcon : IDisposable
     public TrayIcon(Action onShow, Action onExit)
     {
         var menu = new ContextMenuStrip();
-        menu.Items.Add("Show ExileEye", null, (_, _) => onShow());
+        menu.Items.Add(Loc.T("tray_show"), null, (_, _) => onShow());
         menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add("Exit", null, (_, _) => onExit());
+        menu.Items.Add(Loc.T("tray_exit"), null, (_, _) => onExit());
 
         _icon = new NotifyIcon
         {
