@@ -58,7 +58,8 @@ public sealed class TradeClient
 {
     private const string UserAgent =
         "ExileEye/0.1 (+https://github.com/Fsedis/ExileEye; contact prokrastinatorof@gmail.com)";
-    private const int FetchBatch = 10;   // the cheapest N listings is plenty for a price read
+    private const int FetchTarget = 20;  // how many cheapest listings to show (scrollable)
+    private const int FetchChunk = 10;   // the fetch endpoint accepts at most 10 ids per call
 
     private readonly HttpClient _http;
     private readonly RateLimiter _limiter = new();
@@ -93,12 +94,19 @@ public sealed class TradeClient
         if (!root.TryGetProperty("result", out var resultArr) || resultArr.GetArrayLength() == 0)
             return new PriceCheck(label, total, [], browse);
 
-        var ids = resultArr.EnumerateArray().Take(FetchBatch).Select(e => e.GetString()).Where(s => s is not null).ToList();
-        var fetchUrl = $"{baseUrl}/fetch/{string.Join(',', ids)}?query={searchId}";
-        var fetched = await GetAsync(fetchUrl);
-        if (fetched is null) return new PriceCheck(label, total, [], browse);
+        var ids = resultArr.EnumerateArray().Take(FetchTarget).Select(e => e.GetString())
+            .Where(s => s is not null).Select(s => s!).ToList();
 
-        return new PriceCheck(label, total, ParseListings(fetched), browse);
+        // Fetch in chunks of 10 (the endpoint's max) and combine, so the result list is long
+        // enough to scroll through.
+        var listings = new List<Listing>();
+        for (int i = 0; i < ids.Count; i += FetchChunk)
+        {
+            var batch = string.Join(',', ids.Skip(i).Take(FetchChunk));
+            var fetched = await GetAsync($"{baseUrl}/fetch/{batch}?query={searchId}");
+            if (fetched is not null) listings.AddRange(ParseListings(fetched));
+        }
+        return new PriceCheck(label, total, listings, browse);
     }
 
     // {"query":{"status":{"option":"online"}, name?/type?, stats?}, "sort":{"price":"asc"}}
