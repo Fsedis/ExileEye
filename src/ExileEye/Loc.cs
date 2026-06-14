@@ -66,6 +66,11 @@ public static class Loc
         ["open_browser"] = ("Open in browser", "Открыть в браузере"),
         ["market"] = ("Market", "Рынок"),
         ["valuation_currency"] = ("Valuation currency", "Валюта оценки"),
+        ["hdr_price"] = ("Price", "Цена"),
+        ["hdr_level"] = ("Lvl", "Ур"),
+        ["hdr_quality"] = ("Q", "Кач"),
+        ["hdr_seller"] = ("Seller", "Продавец"),
+        ["hdr_age"] = ("Age", "Когда"),
 
         // Tray
         ["tray_show"] = ("Show ExileEye", "Показать ExileEye"),

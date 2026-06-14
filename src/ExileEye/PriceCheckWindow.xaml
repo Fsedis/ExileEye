@@ -73,44 +73,69 @@
             <ComboBox Grid.Column="2" x:Name="CurrencyBox" Margin="2,0" SelectionChanged="OnControlChanged" ToolTip="Valuation currency"/>
         </Grid>
 
-        <!-- Listings table -->
-        <ScrollViewer Grid.Row="4" x:Name="ListingScroll" MaxHeight="260" Margin="8,6,8,0"
-                      VerticalScrollBarVisibility="Auto" ScrollChanged="OnListingScroll">
-            <ItemsControl x:Name="ListingList">
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate>
-                        <Grid Margin="8,2,16,2">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="106"/>
-                                <ColumnDefinition Width="40"/>
-                                <ColumnDefinition Width="40"/>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <ui:SymbolIcon Grid.Column="0" Symbol="Eye24" FontSize="15" Opacity="0.45"
-                                           VerticalAlignment="Center" Margin="0,0,8,0"
-                                           Visibility="{Binding HasTooltip, Converter={StaticResource BoolToVis}}">
-                                <ui:SymbolIcon.ToolTip>
-                                    <ToolTip MaxWidth="420">
-                                        <TextBlock Text="{Binding Tooltip}" TextWrapping="Wrap"/>
-                                    </ToolTip>
-                                </ui:SymbolIcon.ToolTip>
-                            </ui:SymbolIcon>
-                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                                <TextBlock Text="{Binding Amount}" FontWeight="SemiBold" FontSize="13" VerticalAlignment="Center"/>
-                                <Image Source="{Binding Icon}" Width="18" Height="18" Margin="3,0,0,0" VerticalAlignment="Center"/>
-                                <TextBlock Text="{Binding Cur}" Margin="3,0,0,0" Opacity="0.6" FontSize="12" VerticalAlignment="Center"/>
-                            </StackPanel>
-                            <TextBlock Grid.Column="2" Text="{Binding Level}" Opacity="0.5" FontSize="12" VerticalAlignment="Center"/>
-                            <TextBlock Grid.Column="3" Text="{Binding Quality}" Opacity="0.5" FontSize="12" VerticalAlignment="Center"/>
-                            <TextBlock Grid.Column="4" Text="{Binding Account}" Opacity="0.55" TextTrimming="CharacterEllipsis" FontSize="12" VerticalAlignment="Center"/>
-                            <TextBlock Grid.Column="5" Text="{Binding Age}" Opacity="0.4" FontSize="11" VerticalAlignment="Center"/>
-                        </Grid>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
-        </ScrollViewer>
+        <!-- Listings table: header + scrollable rows, columns aligned -->
+        <Grid Grid.Row="4" Margin="8,6,8,0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <!-- Header (matches the row column widths; trailing margin clears the scrollbar) -->
+            <Grid Grid.Row="0" Margin="8,0,16,4">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="24"/>
+                    <ColumnDefinition Width="104"/>
+                    <ColumnDefinition Width="38"/>
+                    <ColumnDefinition Width="34"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="48"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock x:Name="HdrPrice"  Grid.Column="1" Text="Price"  FontSize="11" Opacity="0.5"/>
+                <TextBlock x:Name="HdrLevel"  Grid.Column="2" Text="Lvl"    FontSize="11" Opacity="0.5"/>
+                <TextBlock x:Name="HdrQ"      Grid.Column="3" Text="Q"      FontSize="11" Opacity="0.5"/>
+                <TextBlock x:Name="HdrSeller" Grid.Column="4" Text="Seller" FontSize="11" Opacity="0.5"/>
+                <TextBlock x:Name="HdrAge"    Grid.Column="5" Text="Age"    FontSize="11" Opacity="0.5"/>
+            </Grid>
+
+            <ScrollViewer Grid.Row="1" x:Name="ListingScroll" MaxHeight="252"
+                          VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                          ScrollChanged="OnListingScroll">
+                <ItemsControl x:Name="ListingList">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Grid Margin="8,2,16,2" Height="22">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="24"/>
+                                    <ColumnDefinition Width="104"/>
+                                    <ColumnDefinition Width="38"/>
+                                    <ColumnDefinition Width="34"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="48"/>
+                                </Grid.ColumnDefinitions>
+                                <ui:SymbolIcon Grid.Column="0" Symbol="Eye24" FontSize="14" Opacity="0.45"
+                                               VerticalAlignment="Center"
+                                               Visibility="{Binding HasTooltip, Converter={StaticResource BoolToVis}}">
+                                    <ui:SymbolIcon.ToolTip>
+                                        <ToolTip MaxWidth="420">
+                                            <TextBlock Text="{Binding Tooltip}" TextWrapping="Wrap"/>
+                                        </ToolTip>
+                                    </ui:SymbolIcon.ToolTip>
+                                </ui:SymbolIcon>
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding Amount}" FontWeight="SemiBold" FontSize="13" VerticalAlignment="Center"/>
+                                    <Image Source="{Binding Icon}" Width="17" Height="17" Margin="3,0,0,0" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{Binding Cur}" Margin="3,0,0,0" Opacity="0.6" FontSize="12" VerticalAlignment="Center"/>
+                                </StackPanel>
+                                <TextBlock Grid.Column="2" Text="{Binding Level}" Opacity="0.5" FontSize="12" VerticalAlignment="Center"/>
+                                <TextBlock Grid.Column="3" Text="{Binding Quality}" Opacity="0.5" FontSize="12" VerticalAlignment="Center"/>
+                                <TextBlock Grid.Column="4" Text="{Binding Account}" Opacity="0.6" TextTrimming="CharacterEllipsis" FontSize="12" VerticalAlignment="Center"/>
+                                <TextBlock Grid.Column="5" Text="{Binding Age}" Opacity="0.4" FontSize="11" VerticalAlignment="Center"/>
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </Grid>
 
         <StackPanel Grid.Row="5" Orientation="Horizontal" Margin="16,8,16,16">
             <ui:Button x:Name="SearchButton" Content="Search" Icon="{ui:SymbolIcon Search24}"

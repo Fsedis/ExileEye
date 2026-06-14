@@ -63,6 +63,11 @@ public partial class PriceCheckWindow : FluentWindow
         StatusBox.ToolTip = Loc.T("market");
         ListedBox.ToolTip = Loc.T("listed_within");
         CurrencyBox.ToolTip = Loc.T("valuation_currency");
+        HdrPrice.Text = Loc.T("hdr_price");
+        HdrLevel.Text = Loc.T("hdr_level");
+        HdrQ.Text = Loc.T("hdr_quality");
+        HdrSeller.Text = Loc.T("hdr_seller");
+        HdrAge.Text = Loc.T("hdr_age");
 
         StatusBox.ItemsSource = Settings.StatusOptions.Select(o => o.Label);
         StatusBox.SelectedIndex = IndexOf(Settings.StatusOptions, _settings.TradeStatus);
