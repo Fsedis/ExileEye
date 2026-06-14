@@ -34,6 +34,10 @@ public sealed class Settings
     public string TradeStatus { get; set; } = "available";
     public string TradeListed { get; set; } = "";
 
+    /// <summary>POESESSID cookie from pathofexile.com — needed for the instant-buyout (securable)
+    /// market and higher rate limits. Stored locally in settings.json.</summary>
+    public string PoeSessId { get; set; } = "";
+
     public static readonly (string Code, string Label)[] StatusOptions =
     [
         ("securable", "Instant buyout"),

@@ -44,6 +44,10 @@ public sealed class TradeClient
     private readonly RateLimiter _limiter = new();
     public TradeClient(HttpClient http) => _http = http;
 
+    /// <summary>POESESSID cookie. When set, the API authenticates the request — required for the
+    /// securable (instant-buyout) market and for higher rate limits.</summary>
+    public string? SessionId { get; set; }
+
     /// <summary>Trade host for the client language — item names are copied localized.</summary>
     private static string BaseFor(string language) =>
         (language == "ru" ? "https://ru.pathofexile.com" : "https://www.pathofexile.com") + "/api/trade2";
@@ -166,6 +170,8 @@ public sealed class TradeClient
     {
         req.Headers.TryAddWithoutValidation("User-Agent", UserAgent);
         req.Headers.TryAddWithoutValidation("Accept", "application/json");
+        if (!string.IsNullOrWhiteSpace(SessionId))
+            req.Headers.TryAddWithoutValidation("Cookie", $"POESESSID={SessionId.Trim()}");
         try
         {
             await _limiter.AcquireAsync();   // proactively stay under the per-IP window

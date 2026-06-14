@@ -84,6 +84,7 @@
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
                     <TextBlock Grid.Row="0" Grid.Column="0" Text="Listings" VerticalAlignment="Center" Opacity="0.8"/>
@@ -95,6 +96,12 @@
                     <ComboBox Grid.Row="1" Grid.Column="1" x:Name="ListedBox" Margin="0,2"
                               SelectionChanged="OnTradeOptionChanged"
                               ToolTip="Only listings posted within this window — fresher listings are more likely buyable now."/>
+
+                    <TextBlock Grid.Row="2" Grid.Column="0" Text="POESESSID" VerticalAlignment="Center" Opacity="0.8"/>
+                    <ui:TextBox Grid.Row="2" Grid.Column="1" x:Name="SessionBox" Margin="0,2"
+                                PlaceholderText="paste your session cookie"
+                                LostFocus="OnSessionChanged"
+                                ToolTip="From pathofexile.com browser cookies (F12 → Application → Cookies → POESESSID). Needed for the instant-buyout market. Stored locally."/>
                 </Grid>
             </ui:Card>
 

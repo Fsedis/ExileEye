@@ -134,6 +134,7 @@ public partial class MainWindow : FluentWindow
             Array.FindIndex(Settings.Languages, l => l.Code == _settings.Language));
         StatusBox.ItemsSource = Settings.StatusOptions.Select(o => o.Label);
         StatusBox.SelectedIndex = Math.Max(0, Array.FindIndex(Settings.StatusOptions, o => o.Code == _settings.TradeStatus));
+        SessionBox.Text = _settings.PoeSessId;
         ListedBox.ItemsSource = Settings.ListedOptions.Select(o => o.Label);
         ListedBox.SelectedIndex = Math.Max(0, Array.FindIndex(Settings.ListedOptions, o => o.Code == _settings.TradeListed));
         PopulateLeagues(leagues.Count > 0 ? leagues : Settings.Leagues);
@@ -241,6 +242,16 @@ public partial class MainWindow : FluentWindow
         _settings.Save();
     }
 
+    private void OnSessionChanged(object sender, RoutedEventArgs e)
+    {
+        if (_populating) return;
+        var v = SessionBox.Text.Trim();
+        if (v == _settings.PoeSessId) return;
+        _settings.PoeSessId = v;
+        _settings.Save();
+        if (_trade is not null) _trade.SessionId = v;
+    }
+
     private async void OnLanguageChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
     {
         if (_populating || LanguageBox.SelectedIndex < 0) return;
@@ -274,6 +285,7 @@ public partial class MainWindow : FluentWindow
         try
         {
             _trade ??= new TradeClient(_http);
+            _trade.SessionId = _settings.PoeSessId;   // may be empty; required for instant-buyout
             var accent = System.Drawing.Color.FromArgb(120, 160, 255);
             var grey = System.Drawing.Color.FromArgb(150, 150, 150);
             var green = System.Drawing.Color.FromArgb(96, 255, 128);
