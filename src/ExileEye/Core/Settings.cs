@@ -29,6 +29,14 @@ public sealed class Settings
     public uint ScanHotkeyMods { get; set; } = 2;
     public uint ScanHotkeyVk { get; set; } = 0x53;
 
+    // Trade search options (see TradeOptions). BuyoutOnly default true = the API default (excludes
+    // unpriced). TradeListed limits listing age: "", "1day", "3days", "1week".
+    public bool BuyoutOnly { get; set; } = true;
+    public string TradeListed { get; set; } = "";
+
+    public static readonly (string Code, string Label)[] ListedOptions =
+        [("", "Any time"), ("1day", "Last day"), ("3days", "Last 3 days"), ("1week", "Last week")];
+
     [JsonIgnore]
     public Rectangle Region
     {

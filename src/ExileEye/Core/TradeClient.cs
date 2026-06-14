@@ -11,6 +11,14 @@ public sealed record Listing(decimal Amount, string Currency);
 /// <summary>A trade stat filter: the stat id and an optional minimum value.</summary>
 public sealed record TradeStat(string Id, double? Min = null);
 
+/// <summary>
+/// Where/how to search. Status: "online"/"any". BuyoutOnly: the default search already excludes
+/// unpriced listings (buyout/fixed price); set false to include "any" sale type. Listed: the
+/// "indexed" age filter ("", "1day", "3days", "1week") — fresher listings are the ones you can
+/// actually buy now.
+/// </summary>
+public sealed record TradeOptions(string Status = "online", bool BuyoutOnly = true, string Listed = "");
+
 /// <summary>Price-check result: the searchable item, total listings online, and the cheapest few.</summary>
 public sealed record PriceCheck(string Label, int Total, IReadOnlyList<Listing> Listings, string? BrowseUrl = null)
 {
@@ -47,13 +55,13 @@ public sealed class TradeClient
         (language == "ru" ? "https://ru.pathofexile.com" : "https://www.pathofexile.com") + "/api/trade2";
 
     public async Task<PriceCheck?> CheckAsync(ParsedItem item, string league, string language = "en",
-        IReadOnlyList<TradeStat>? stats = null)
+        IReadOnlyList<TradeStat>? stats = null, TradeOptions? options = null)
     {
         if (!item.IsSearchable) return null;
         var baseUrl = BaseFor(language);
         var label = item.Name ?? item.Type ?? "?";
 
-        var query = BuildQuery(item, stats);
+        var query = BuildQuery(item, stats, options ?? new TradeOptions());
         var searchUrl = $"{baseUrl}/search/{Uri.EscapeDataString(league)}";
         var search = await PostJsonAsync(searchUrl, query);
         if (search is null) return null;
@@ -78,14 +86,22 @@ public sealed class TradeClient
     // {"query":{"status":{"option":"online"}, name?/type?, stats?}, "sort":{"price":"asc"}}
     // Each stat filter carries its id and an optional min value (the user picks which mods and
     // their minimums in the price-check window).
-    private static string BuildQuery(ParsedItem item, IReadOnlyList<TradeStat>? stats)
+    private static string BuildQuery(ParsedItem item, IReadOnlyList<TradeStat>? stats, TradeOptions opts)
     {
         var q = new Dictionary<string, object>
         {
-            ["status"] = new Dictionary<string, string> { ["option"] = "online" },
+            ["status"] = new Dictionary<string, string> { ["option"] = opts.Status },
         };
         if (!string.IsNullOrEmpty(item.Name)) q["name"] = item.Name;
         if (!string.IsNullOrEmpty(item.Type)) q["type"] = item.Type;
+
+        // trade_filters: sale type (default = buyout/fixed, i.e. omit the filter) and listing age.
+        var tf = new Dictionary<string, object>();
+        if (!opts.BuyoutOnly) tf["sale_type"] = new Dictionary<string, string> { ["option"] = "any" };
+        if (!string.IsNullOrEmpty(opts.Listed)) tf["indexed"] = new Dictionary<string, string> { ["option"] = opts.Listed };
+        if (tf.Count > 0)
+            q["filters"] = new Dictionary<string, object> { ["trade_filters"] = new Dictionary<string, object> { ["filters"] = tf } };
+
         if (stats is { Count: > 0 })
         {
             q["stats"] = new[]

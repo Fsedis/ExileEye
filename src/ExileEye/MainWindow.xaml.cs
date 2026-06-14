@@ -132,6 +132,9 @@ public partial class MainWindow : FluentWindow
         LanguageBox.ItemsSource = Settings.Languages.Select(l => l.Label);
         LanguageBox.SelectedIndex = Math.Max(0,
             Array.FindIndex(Settings.Languages, l => l.Code == _settings.Language));
+        BuyoutBox.IsChecked = _settings.BuyoutOnly;
+        ListedBox.ItemsSource = Settings.ListedOptions.Select(o => o.Label);
+        ListedBox.SelectedIndex = Math.Max(0, Array.FindIndex(Settings.ListedOptions, o => o.Code == _settings.TradeListed));
         PopulateLeagues(leagues.Count > 0 ? leagues : Settings.Leagues);
         _populating = false;
 
@@ -290,6 +293,15 @@ public partial class MainWindow : FluentWindow
         return true;
     }
 
+    private void OnTradeOptionChanged(object sender, RoutedEventArgs e)
+    {
+        if (_populating) return;
+        _settings.BuyoutOnly = BuyoutBox.IsChecked == true;
+        if (ListedBox.SelectedIndex >= 0)
+            _settings.TradeListed = Settings.ListedOptions[ListedBox.SelectedIndex].Code;
+        _settings.Save();
+    }
+
     private async void OnLanguageChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
     {
         if (_populating || LanguageBox.SelectedIndex < 0) return;
@@ -373,9 +385,11 @@ public partial class MainWindow : FluentWindow
                 }
             }
 
+            var tradeOpts = new TradeOptions(BuyoutOnly: _settings.BuyoutOnly, Listed: _settings.TradeListed);
+
             if (mods.Count > 0)
             {
-                var win = new PriceCheckWindow(item, mods, _trade, _settings.League, _settings.Language);
+                var win = new PriceCheckWindow(item, mods, _trade, _settings.League, _settings.Language, tradeOpts);
                 win.Show();
                 win.PositionAt(System.Windows.Forms.Cursor.Position);
                 return;
@@ -383,7 +397,7 @@ public partial class MainWindow : FluentWindow
 
             // No mods (currency, gems, uniques) → quick toast price.
             PriceToast.Show(System.Windows.Forms.Cursor.Position, label, "checking price…", accent);
-            var result = await _trade.CheckAsync(item, _settings.League, _settings.Language);
+            var result = await _trade.CheckAsync(item, _settings.League, _settings.Language, null, tradeOpts);
             var at = System.Windows.Forms.Cursor.Position;
             if (result is null) { PriceToast.Show(at, label, "no data (rate-limited or offline)", grey); return; }
             var typ = result.Typical();

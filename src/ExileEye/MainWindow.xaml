@@ -75,6 +75,29 @@
                 </Grid>
             </ui:Card>
 
+            <ui:Card Margin="0,0,0,10" Padding="14">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="130"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Trade search" VerticalAlignment="Center" Opacity="0.8"/>
+                    <CheckBox Grid.Row="0" Grid.Column="1" x:Name="BuyoutBox" Content="Instant buyout only"
+                              Click="OnTradeOptionChanged"
+                              ToolTip="Exclude listings with no set price (negotiable). On by default."/>
+
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Listed within" VerticalAlignment="Center" Opacity="0.8"/>
+                    <ComboBox Grid.Row="1" Grid.Column="1" x:Name="ListedBox" Margin="0,2"
+                              SelectionChanged="OnTradeOptionChanged"
+                              ToolTip="Only listings posted within this window — fresher listings are more likely buyable now."/>
+                </Grid>
+            </ui:Card>
+
             <ui:Button x:Name="StartStopButton" Content="Start" Appearance="Primary"
                        Icon="{ui:SymbolIcon Play24}" HorizontalAlignment="Stretch"
                        FontSize="15" Padding="0,10" IsEnabled="False"

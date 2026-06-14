@@ -30,18 +30,20 @@ public partial class PriceCheckWindow : FluentWindow
     private readonly TradeClient _trade;
     private readonly string _league;
     private readonly string _language;
+    private readonly TradeOptions _options;
     private readonly ObservableCollection<ModFilter> _mods;
     private string? _browseUrl;
     private bool _searching;
 
     public PriceCheckWindow(ParsedItem item, IReadOnlyList<ModFilter> mods,
-        TradeClient trade, string league, string language)
+        TradeClient trade, string league, string language, TradeOptions options)
     {
         InitializeComponent();
         _item = item;
         _trade = trade;
         _league = league;
         _language = language;
+        _options = options;
         _mods = new ObservableCollection<ModFilter>(mods);
 
         ItemLabel.Text = item.Name ?? item.Type ?? "?";
@@ -89,7 +91,7 @@ public partial class PriceCheckWindow : FluentWindow
             }
             ResultText.Text = "Searching…";
 
-            var result = await _trade.CheckAsync(_item, _league, _language, stats.Count > 0 ? stats : null);
+            var result = await _trade.CheckAsync(_item, _league, _language, stats.Count > 0 ? stats : null, _options);
             if (result is null) { ResultText.Text = "No data (rate-limited or offline)."; return; }
 
             _browseUrl = result.BrowseUrl;
